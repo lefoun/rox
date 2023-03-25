@@ -1,4 +1,5 @@
 pub mod error;
+pub mod parser;
 pub mod scanner;
 
 use crate::error::Error;
@@ -6,6 +7,11 @@ use std::fs;
 use std::io::{self, BufRead, Write};
 
 fn run(content: String) -> Result<(), Error> {
+    let mut scanner = scanner::Scanner::new(content);
+    let tokens = scanner.scan_tokens();
+    for token in tokens {
+        println!("{:?}", token);
+    }
     Ok(())
 }
 
@@ -21,8 +27,6 @@ pub fn run_prompt() {
     io::stdout().flush().unwrap();
 
     for line in reader.lock().lines() {
-        print!(">>> ");
-        io::stdout().flush().unwrap();
         if let Err(e) = line {
             eprintln!("{e}");
         } else {
@@ -31,6 +35,8 @@ pub fn run_prompt() {
                 eprintln!("Error of type {e} when runing lox scanner");
             }
         }
+        print!(">>> ");
+        io::stdout().flush().unwrap();
     }
 }
 
