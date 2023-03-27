@@ -22,7 +22,7 @@ impl Scanner {
             ("fun", Fun),
             ("for", For),
             ("if", If),
-            ("nulll", Null),
+            ("null", Null),
             ("or", Or),
             ("print", Print),
             ("return", Return),
@@ -44,10 +44,6 @@ impl Scanner {
             had_error: false,
             keywords,
         }
-    }
-
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
     }
 
     pub fn scan_tokens(&mut self) -> Vec<Token> {
@@ -266,42 +262,22 @@ impl Token {
         }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn lexem(&self) -> &str {
+        self.lexem.as_str()
+    }
+
+    pub fn token_type(&self) -> TokenType {
+        self.token_type.clone()
+    }
+}
+
+impl ToString for Token {
+    fn to_string(&self) -> String {
         format!("{:?} {}", self.token_type, self.lexem)
     }
 
     pub fn line(&self) -> usize {
         self.line
-    }
-}
-
-trait Expr {
-    fn left(&self) -> Option<&dyn Expr> {
-        None
-    }
-    fn right(&self) -> Option<&dyn Expr> {
-        None
-    }
-    fn operator(&self) -> Option<&Token> {
-        None
-    }
-}
-
-struct Binary {
-    left: Box<dyn Expr>,
-    right: Box<dyn Expr>,
-    operator: Token,
-}
-
-impl Expr for Binary {
-    fn left(&self) -> Option<&dyn Expr> {
-        Some(self.left.as_ref())
-    }
-    fn right(&self) -> Option<&dyn Expr> {
-        Some(self.right.as_ref())
-    }
-    fn operator(&self) -> Option<&Token> {
-        Some(&self.operator)
     }
 }
 

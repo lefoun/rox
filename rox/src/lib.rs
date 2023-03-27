@@ -2,7 +2,7 @@ pub mod error;
 pub mod parser;
 pub mod scanner;
 
-use crate::error::Error;
+use error::Error;
 use std::fs;
 use std::io::{self, BufRead, Write};
 
@@ -42,4 +42,3 @@ pub fn run_prompt() {
 
 #[cfg(test)]
 mod tests {}
-
