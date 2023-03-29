@@ -2,20 +2,27 @@ pub mod error;
 pub mod parser;
 pub mod scanner;
 
-use error::Error;
+use error::ScanError;
+use parser::{AstPrinter, Visitor};
 use std::fs;
 use std::io::{self, BufRead, Write};
 
-fn run(content: String) -> Result<(), Error> {
+fn run(content: String) -> Result<(), ScanError> {
     let mut scanner = scanner::Scanner::new(content);
     let tokens = scanner.scan_tokens();
-    for token in tokens {
-        println!("{:?}", token);
+    let mut parser = parser::Parser::new(tokens.into_iter());
+    match parser.parse() {
+        Some(expr) => {
+            println!("Found Expression");
+            let ast_printer = AstPrinter;
+            println!("{}", ast_printer.visit_expr(&expr));
+        }
+        None => println!("Found No Expression"),
     }
     Ok(())
 }
 
-pub fn run_file(path: String) -> Result<(), Error> {
+pub fn run_file(path: String) -> Result<(), ScanError> {
     let contents = fs::read_to_string(path)?;
     run(contents)
 }

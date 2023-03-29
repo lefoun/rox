@@ -9,10 +9,12 @@ fn define_ast(output_file: &mut File, types: &[&str]) -> Result<(), std::io::Err
         output_file,
         "// Automatically generated Structs, Traits and their impl.\n"
     )?;
+    // should change this to only include relevant names
+    write!(output_file, "use crate::scanner::*;\n")?;
     for type_ in types {
         let mut line = type_.split(':');
         let struct_name = line.next().unwrap().split_whitespace().next().unwrap();
-        write!(output_file, "#[derive(Expr)]\n")?;
+        write!(output_file, "#[derive(Expr, Impl)]\n")?;
         write!(output_file, "struct {struct_name} {{\n")?;
         let members = line.next().unwrap().split(',');
         for member in members {

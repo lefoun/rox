@@ -269,15 +269,15 @@ impl Token {
     pub fn token_type(&self) -> TokenType {
         self.token_type.clone()
     }
+
+    pub fn line(&self) -> usize {
+        self.line
+    }
 }
 
 impl ToString for Token {
     fn to_string(&self) -> String {
         format!("{:?} {}", self.token_type, self.lexem)
-    }
-
-    pub fn line(&self) -> usize {
-        self.line
     }
 }
 
