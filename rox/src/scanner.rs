@@ -80,19 +80,19 @@ impl Scanner {
             '}' => self.add_token(RightBrace, c),
 
             '!' => match source.next_if_eq(&(pos + 1, '=')) {
-                Some((_, chr)) => self.add_token(BangEqual, chr),
+                Some(_) => self.add_long_token(BangEqual, "!="),
                 None => self.add_token(Bang, c),
             },
             '>' => match source.next_if_eq(&(pos + 1, '=')) {
-                Some((_, chr)) => self.add_token(GreaterEqual, chr),
+                Some(_) => self.add_long_token(GreaterEqual, ">="),
                 None => self.add_token(Greater, c),
             },
             '=' => match source.next_if_eq(&(pos + 1, '=')) {
-                Some((_, chr)) => self.add_token(DoubleEqual, chr),
+                Some(_) => self.add_long_token(DoubleEqual, "=="),
                 None => self.add_token(Equal, c),
             },
             '<' => match source.next_if_eq(&(pos + 1, '=')) {
-                Some((_, chr)) => self.add_token(LessEqual, chr),
+                Some(_) => self.add_long_token(LessEqual, "<="),
                 None => self.add_token(Less, c),
             },
             '/' => match source.next_if_eq(&(pos + 1, '/')) {
@@ -122,6 +122,10 @@ impl Scanner {
     fn add_token(&mut self, tkn_type: TokenType, lexem: char) {
         self.tokens
             .push(Token::new(tkn_type, self.line, lexem.to_string()));
+    }
+
+    fn add_long_token(&mut self, tkn_type: TokenType, lexem: &str) {
+        self.tokens.push(Token::new(tkn_type, self.line, lexem.to_string()));
     }
 
     fn add_literal_token(&mut self, chr: char, source: &mut impl Iterator<Item = (usize, char)>) {
@@ -275,9 +279,9 @@ impl Token {
     }
 }
 
-impl ToString for Token {
-    fn to_string(&self) -> String {
-        format!("{:?} {}", self.token_type, self.lexem)
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.lexem())
     }
 }
 

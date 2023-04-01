@@ -23,7 +23,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let field_name = f.ident.as_ref().expect(
             format!(
                 "Expected field_name to from struct {}  to have an ident",
-                name.to_string()
+                name
             )
             .as_str(),
         );

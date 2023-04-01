@@ -1,29 +1,37 @@
 pub mod error;
+pub mod expr;
+mod interepreter;
 pub mod parser;
 pub mod scanner;
 
-use error::ScanError;
-use parser::{AstPrinter, Visitor};
+use error::RoxError;
+use interepreter::Interpreter;
 use std::fs;
 use std::io::{self, BufRead, Write};
 
-fn run(content: String) -> Result<(), ScanError> {
+fn run(content: String) -> Result<(), RoxError> {
     let mut scanner = scanner::Scanner::new(content);
     let tokens = scanner.scan_tokens();
     let mut parser = parser::Parser::new(tokens.into_iter());
+    let interepreter = Interpreter;
     match parser.parse() {
         Some(expr) => {
-            println!("Found Expression");
-            let ast_printer = AstPrinter;
-            println!("{}", ast_printer.visit_expr(&expr));
+            println!("Found Expression {:?}", expr);
+            match interepreter.interpret(expr) {
+                Ok(v) => println!("{v}"),
+                Err(e) => {
+                    eprintln!("{e}");
+                    return Err(RoxError::RuntimeError);
+                }
+            }
         }
         None => println!("Found No Expression"),
     }
     Ok(())
 }
 
-pub fn run_file(path: String) -> Result<(), ScanError> {
-    let contents = fs::read_to_string(path)?;
+pub fn run_file(path: String) -> Result<(), RoxError> {
+    let contents = fs::read_to_string(path).unwrap();
     run(contents)
 }
 

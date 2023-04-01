@@ -1,13 +1,22 @@
 use crate::error::ParseError;
-use crate::scanner::{Token, TokenType};
-use std::iter::{self, Peekable};
-use TokenType::*;
+use crate::expr::{
+    expr_type::{self, *},
+    Expr,
+};
+use crate::scanner::{
+    Token,
+    TokenType::{self, *},
+};
+use std::iter::Peekable;
 
-pub enum Expr {
-    Binary(Box<Expr>, Token, Box<Expr>),
-    Grouping(Box<Expr>),
-    Literal(Token),
-    Unary(Token, Box<Expr>),
+pub trait Visitor {
+    type Value;
+    type Error;
+    fn accept(&self, expr: Expr) -> Result<Self::Value, Self::Error>;
+    fn visit_binary(&self, expr: expr_type::Binary) -> Result<Self::Value, Self::Error>;
+    fn visit_grouping(&self, expr: expr_type::Grouping) -> Result<Self::Value, Self::Error>;
+    fn visit_literal(&self, expr: expr_type::Literal) -> Result<Self::Value, Self::Error>;
+    fn visit_unary(&self, expr: expr_type::Unary) -> Result<Self::Value, Self::Error>;
 }
 
 pub struct Parser<T: Iterator<Item = Token>> {
@@ -39,10 +48,10 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         let mut expr = self.comparison()?;
         while let Some(operator) = self
             .tokens
-            .next_if(|token| Self::matches(token, &[Equal, BangEqual]))
+            .next_if(|token| Self::matches(token, &[DoubleEqual, BangEqual]))
         {
             let right = self.comparison()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+            expr = Expr::Binary(Binary::new(Box::new(expr), operator, Box::new(right)));
         }
         Ok(expr)
     }
@@ -54,7 +63,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             .next_if(|token| Self::matches(token, &[Less, LessEqual, Greater, GreaterEqual]))
         {
             let right = self.term()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+            expr = Expr::Binary(Binary::new(Box::new(expr), operator, Box::new(right)));
         }
         Ok(expr)
     }
@@ -66,7 +75,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             .next_if(|token| Self::matches(token, &[Plus, Minus]))
         {
             let right = self.factor()?;
-            expr = Expr::Binary(Box::new(expr), op, Box::new(right));
+            expr = Expr::Binary(Binary::new(Box::new(expr), op, Box::new(right)));
         }
         Ok(expr)
     }
@@ -78,7 +87,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             .next_if(|token| Self::matches(token, &[Star, Slash]))
         {
             let right = self.unary()?;
-            expr = Expr::Binary(Box::new(expr), op, Box::new(right));
+            expr = Expr::Binary(Binary::new(Box::new(expr), op, Box::new(right)));
         }
         Ok(expr)
     }
@@ -89,7 +98,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             .next_if(|token| Self::matches(token, &[Minus, Bang]))
         {
             let expr = self.unary()?;
-            Ok(Expr::Unary(op, Box::new(expr)))
+            Ok(Expr::Unary(Unary::new(op, Box::new(expr))))
         } else {
             self.primary()
         }
@@ -98,12 +107,14 @@ impl<T: Iterator<Item = Token>> Parser<T> {
     fn primary(&mut self) -> Result<Expr, ParseError> {
         if let Some(token) = self.tokens.next() {
             match token.token_type() {
-                True | False | Number(_) | RoxString(_) | Null => Ok(Expr::Literal(token)),
+                True | False | Number(_) | RoxString(_) | Null => {
+                    Ok(Expr::Literal(Literal::new(token)))
+                }
                 LeftParen => {
                     let expr = self.expression()?;
                     match self.tokens.next() {
                         Some(tkn) if tkn.token_type() == RightParen => {
-                            Ok(Expr::Grouping(Box::new(expr)))
+                            Ok(Expr::Grouping(Grouping::new(Box::new(expr))))
                         }
                         Some(other) => Err(ParseError::UnexpectedToken {
                             token: other.lexem().to_string(),
@@ -112,8 +123,8 @@ impl<T: Iterator<Item = Token>> Parser<T> {
                         None => Err(ParseError::UnexpectedEOF),
                     }
                 }
-                other => Err(ParseError::UnexpectedToken {
-                    token: format!("{:?}", other),
+                _ => Err(ParseError::UnexpectedToken {
+                    token: token.to_string(),
                     line: token.line(),
                 }),
             }
@@ -136,77 +147,55 @@ impl<T: Iterator<Item = Token>> Parser<T> {
     }
 }
 
-pub trait Visitor {
-    type Value;
-    fn visit_expr(&self, expr: &Expr) -> Self::Value;
-}
+// struct AstPrinter;
 
-pub struct AstPrinter;
+// impl AstPrinter {
+//     fn eval(&self, expr: &Expr) -> String {
+//         match &expr {
+//             Expr::Binary(Binary(lhs, op, rhs)) => {
+//                 self.parenthesize(op.lexem(), iter::once(lhs).chain(iter::once(rhs)))
+//             }
+//             Expr::Grouping(Grouping(exp)) => self.parenthesize("group", iter::once(exp)),
+//             Expr::Literal(Literal(token)) => token.lexem().to_owned(),
+//             Expr::Unary(Unary(token, exp)) => self.parenthesize(token.lexem(), iter::once(exp)),
+//         }
+//     }
+//     fn parenthesize<'a, T: Iterator<Item = &'a Box<Expr>>>(&self, name: &str, exprs: T) -> String {
+//         let mut s = String::new();
+//         s.push('(');
+//         s.push(' ');
+//         s.push_str(name);
+//         for expr in exprs {
+//             s.push(' ');
+//             s.push_str(&self.eval(expr));
+//         }
+//         s.push(')');
+//         s
+//     }
+// }
 
-impl Visitor for AstPrinter {
-    type Value = String;
-    fn visit_expr(&self, expr: &Expr) -> Self::Value {
-        match &expr {
-            Expr::Binary(lhs, op, rhs) => {
-                self.parenthesize(op.lexem(), iter::once(lhs).chain(iter::once(rhs)))
-            }
-            Expr::Grouping(exp) => self.parenthesize("group", iter::once(exp)),
-            Expr::Literal(token) => token.lexem().to_owned(),
-            Expr::Unary(token, exp) => self.parenthesize(token.lexem(), iter::once(exp)),
-        }
-    }
-}
+// mod test {
+//     use super::{AstPrinter, Expr, TokenType, Binary, Unary, Grouping, Literal};
+//     use crate::scanner::Token;
 
-impl AstPrinter {
-    fn parenthesize<'a, T: Iterator<Item = &'a Box<Expr>>>(&self, name: &str, exprs: T) -> String {
-        let mut s = String::new();
-        s.push('(');
-        s.push(' ');
-        s.push_str(name);
-        for expr in exprs {
-            s.push(' ');
-            s.push_str(&self.visit_expr(expr));
-        }
-        s.push(')');
-        s
-    }
-}
+//     #[test]
+//     fn it_prints() {
+//         use Expr::*;
+//         use TokenType::*;
+//         let printer = AstPrinter;
+//         let expr = Binary(Binary(
+//             Box::new(Unary(Unary(
+//                 Token::new(Minus, 0, String::from("-")),
+//                 Box::new(Literal(Literal(Token::new(Number(43.2), 0, String::from("43.2"))))),
+//             ))),
+//             Token::new(Star, 0, String::from("*")),
+//             Box::new(Grouping(Grouping(Box::new(Literal(Literal(Token::new(
+//                 Number(42.0),
+//                 0,
+//                 String::from("42.0"),
+//             ))))))),
+//         );
 
-impl<T: Iterator<Item = Token>> Visitor for Parser<T> {
-    type Value = Token;
-    fn visit_expr(&self, expr: &Expr) -> Self::Value {
-        match &expr {
-            Expr::Binary(lhs, op, rhs) => (),
-            Expr::Grouping(e) => (),
-            Expr::Literal(t) => (),
-            Expr::Unary(t, op) => (),
-        };
-        Token::new(TokenType::And, 2, String::from("lol"))
-    }
-}
-
-mod test {
-    use super::{AstPrinter, Expr, TokenType};
-    use crate::{parser::Visitor, scanner::Token};
-
-    #[test]
-    fn it_prints() {
-        use Expr::*;
-        use TokenType::*;
-        let printer = AstPrinter;
-        let expr = Binary(
-            Box::new(Unary(
-                Token::new(Minus, 0, String::from("-")),
-                Box::new(Literal(Token::new(Number(43.2), 0, String::from("43.2")))),
-            )),
-            Token::new(Star, 0, String::from("*")),
-            Box::new(Grouping(Box::new(Literal(Token::new(
-                Number(42.0),
-                0,
-                String::from("42.0"),
-            ))))),
-        );
-
-        println!("Ast printed: {}", printer.visit_expr(&expr));
-    }
-}
+//         println!("Ast printed: {}", printer.eval(&expr));
+//     }
+// }

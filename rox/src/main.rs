@@ -1,12 +1,12 @@
-use rox;
+use rox::{self, error::RoxError};
 use std::env;
-fn main() -> Result<(), rox::error::ScanError> {
+fn main() {
     match env::args().len() {
-        1 => Ok(rox::run_prompt()),
-        2 => rox::run_file(env::args().into_iter().nth(2).unwrap()),
-        _ => {
-            println!("Usage: lox [script]");
-            return Err(rox::error::ScanError::BadArguments);
-        }
+        1 => rox::run_prompt(),
+        2 => match rox::run_file(env::args().nth(1).unwrap()) {
+            Ok(()) => (),
+            Err(_) => std::process::exit(76),
+        },
+        _ => println!("Usage: lox [script]"),
     }
 }
