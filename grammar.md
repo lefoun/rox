@@ -1,4 +1,8 @@
 # Production rules
+program         -> statement* EOF ;
+statement       -> printStmt | exprStmt ;
+exprStmt        -> expression ";" ;
+printStmt       -> "print" expression ";" ;
 expression      -> equality ;
 equality        -> comparison (( "==" | "!=" ) comparison )* ;
 comparison      -> term (( ">" | "<" | ">=" | "<=" ) term )* ;

@@ -22,7 +22,7 @@ pub enum ScanError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParseError {
-    #[error("Parse error at line: {line} Unexpected Token {token}")]
+    #[error("Parse error at line: {line} Unexpected token {token}")]
     UnexpectedToken { token: String, line: usize },
 
     #[error("Parse error: Unexpected end of file")]

@@ -1,7 +1,7 @@
 use crate::error::RuntimeError::{self, *};
-use crate::expr::{expr_type, Expr};
-use crate::parser::Visitor;
+use crate::exprs::{expr_type, Expr, ExprVisitor};
 use crate::scanner::TokenType::{self, *};
+use crate::stmts::{Stmt, StmtVisitor};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -36,11 +36,16 @@ struct Object {
 pub struct Interpreter;
 
 impl Interpreter {
-    pub fn interpret(&self, expr: Expr) -> Result<String, RuntimeError> {
-        match self.accept(expr) {
-            Ok(v) => Ok(v.to_string()),
-            Err(e) => Err(e),
+    pub fn interpret(&self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
+        for stmt in stmts {
+            self.execute(stmt)?;
         }
+        Ok(())
+    }
+
+    fn execute(&self, stmt: Stmt) -> Result<(), RuntimeError> {
+        StmtVisitor::accept(self, stmt)?;
+        Ok(())
     }
 
     fn token_type_matches(ty: &TokenType, typs: &[TokenType]) -> bool {
@@ -72,6 +77,7 @@ impl Interpreter {
             _ => Self::eq_op(lhs, rhs, op),
         }
     }
+
     fn eq_op<T: PartialEq + std::fmt::Display>(lhs: T, rhs: T, op: &TokenType) -> Value {
         let v = match op {
             DoubleEqual => lhs == rhs,
@@ -82,7 +88,36 @@ impl Interpreter {
     }
 }
 
-impl Visitor for Interpreter {
+impl StmtVisitor for Interpreter {
+    type Value = ();
+    type Error = RuntimeError;
+
+    fn accept(&self, stmt: Stmt) -> Result<Self::Value, Self::Error> {
+        match stmt {
+            Stmt::Print(s) => self.visit_print_stmt(s),
+            Stmt::ExprStmt(s) => self.visit_expr_stmt(s),
+        }
+    }
+
+    fn visit_expr_stmt(
+        &self,
+        stmt: crate::stmts::stmt_type::ExprStmt,
+    ) -> Result<Self::Value, Self::Error> {
+        ExprVisitor::accept(self, *(stmt.value().clone()))?;
+        Ok(())
+    }
+
+    fn visit_print_stmt(
+        &self,
+        stmt: crate::stmts::stmt_type::Print,
+    ) -> Result<Self::Value, Self::Error> {
+        let v = ExprVisitor::accept(self, *(stmt.value().clone()))?;
+        println!("{v}");
+        Ok(())
+    }
+}
+
+impl ExprVisitor for Interpreter {
     type Value = Value;
     type Error = RuntimeError;
 
@@ -112,9 +147,9 @@ impl Visitor for Interpreter {
     }
 
     fn visit_binary(&self, expr: expr_type::Binary) -> Result<Self::Value, Self::Error> {
-        let left = self.accept(*expr.lhs().clone())?;
+        let left = ExprVisitor::accept(self, *expr.lhs().clone())?;
         let op = expr.op_ty();
-        let right = self.accept(*expr.rhs().clone())?;
+        let right = ExprVisitor::accept(self, *expr.rhs().clone())?;
 
         if !Self::token_type_matches(
             &op,
@@ -219,11 +254,11 @@ impl Visitor for Interpreter {
     }
 
     fn visit_grouping(&self, expr: expr_type::Grouping) -> Result<Self::Value, Self::Error> {
-        self.accept(*expr.ty().clone())
+        ExprVisitor::accept(self, *expr.ty().clone())
     }
 
     fn visit_unary(&self, expr: expr_type::Unary) -> Result<Self::Value, Self::Error> {
-        let v = self.accept(*expr.ty().clone())?;
+        let v = ExprVisitor::accept(self, *expr.ty().clone())?;
         Ok(match expr.op_ty() {
             Bang => match v {
                 Value::Bool(value) => Value::Bool(!value),

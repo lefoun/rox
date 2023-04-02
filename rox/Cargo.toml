@@ -11,3 +11,4 @@ default-run = "rox"
 [dependencies]
 thiserror = "1.0.38"
 macros = { path = "../macros" }
+peeking_take_while = "1.0.0"

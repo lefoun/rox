@@ -1,4 +1,6 @@
+use peeking_take_while::{self, PeekableExt};
 use std::collections::HashMap;
+use std::iter::Peekable;
 use std::str::CharIndices;
 
 pub struct Scanner {
@@ -98,7 +100,7 @@ impl Scanner {
             '/' => match source.next_if_eq(&(pos + 1, '/')) {
                 Some(_) => {
                     source
-                        .take_while(|(_, char)| *char != '\n')
+                        .peeking_take_while(|(_, char)| *char != '\n')
                         .for_each(|(_, char)| {
                             if char == '\n' {
                                 self.line += 1;
@@ -125,33 +127,34 @@ impl Scanner {
     }
 
     fn add_long_token(&mut self, tkn_type: TokenType, lexem: &str) {
-        self.tokens.push(Token::new(tkn_type, self.line, lexem.to_string()));
+        self.tokens
+            .push(Token::new(tkn_type, self.line, lexem.to_string()));
     }
 
-    fn add_literal_token(&mut self, chr: char, source: &mut impl Iterator<Item = (usize, char)>) {
+    fn add_literal_token(&mut self, chr: char, source: &mut Peekable<CharIndices>) {
         let mut literal: String = String::from(chr);
         literal.extend(
             source
-                .take_while(|(_, chr)| chr.is_ascii_alphabetic() || *chr == '_')
+                .peeking_take_while(|(_, chr)| chr.is_ascii_alphabetic() || *chr == '_')
                 .map(|(_, chr)| chr),
         );
 
         self.current += literal.len();
-
-        let lexem = self.source.as_str()[self.start..self.current].to_owned();
         match self.keywords.get(&literal) {
-            Some(val) => self.tokens.push(Token::new(val.clone(), self.line, lexem)),
+            Some(val) => self
+                .tokens
+                .push(Token::new(val.clone(), self.line, literal)),
             None => self
                 .tokens
-                .push(Token::new(TokenType::Identifier, self.line, lexem)),
+                .push(Token::new(TokenType::Identifier, self.line, literal)),
         }
     }
 
-    fn add_number_token(&mut self, chr: char, source: &mut impl Iterator<Item = (usize, char)>) {
+    fn add_number_token(&mut self, chr: char, source: &mut Peekable<CharIndices>) {
         let mut num: String = String::from(chr);
         num.extend(
             source
-                .take_while(|(_, c)| c.is_ascii_alphanumeric() || *c == '.')
+                .peeking_take_while(|(_, c)| c.is_ascii_alphanumeric() || *c == '.')
                 .map(|(_, c)| c),
         );
 

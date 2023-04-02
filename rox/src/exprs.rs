@@ -1,5 +1,5 @@
-use crate::scanner::{Token, TokenType};
 use expr_type::*;
+use crate::scanner::{Token, TokenType};
 
 pub trait ExprVisitor {
     type Value;
@@ -20,9 +20,20 @@ pub enum Expr {
     Unary(Unary),
 }
 
+impl Expr {
+    pub fn line(&self) -> usize {
+        match &self {
+            Self::Binary(e) => e.line(),
+            Self::Literal(e) => e.line(),
+            Self::Grouping(e) => e.ty().line(),
+            Self::Unary(e) => e.line(),
+        }
+    }
+}
+
 pub mod expr_type {
     use super::*;
-    #[derive(Debug, Clone)]
+    #[derive(Debug,Clone)]
     pub struct Binary(Box<Expr>, Token, Box<Expr>);
     impl Binary {
         pub fn new(lhs: Box<Expr>, op: Token, rhs: Box<Expr>) -> Self {
@@ -82,7 +93,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug,Clone)]
     pub struct Unary(Token, Box<Expr>);
     impl Unary {
         pub fn new(op: Token, rhs: Box<Expr>) -> Self {

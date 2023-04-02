@@ -1,8 +1,9 @@
 pub mod error;
-pub mod expr;
+pub mod exprs;
 mod interepreter;
 pub mod parser;
 pub mod scanner;
+pub mod stmts;
 
 use error::RoxError;
 use interepreter::Interpreter;
@@ -14,20 +15,14 @@ fn run(content: String) -> Result<(), RoxError> {
     let tokens = scanner.scan_tokens();
     let mut parser = parser::Parser::new(tokens.into_iter());
     let interepreter = Interpreter;
-    match parser.parse() {
-        Some(expr) => {
-            println!("Found Expression {:?}", expr);
-            match interepreter.interpret(expr) {
-                Ok(v) => println!("{v}"),
-                Err(e) => {
-                    eprintln!("{e}");
-                    return Err(RoxError::RuntimeError);
-                }
-            }
+    let statements = parser.parse();
+    match interepreter.interpret(statements) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            eprintln!("{e}");
+            return Err(RoxError::RuntimeError);
         }
-        None => println!("Found No Expression"),
     }
-    Ok(())
 }
 
 pub fn run_file(path: String) -> Result<(), RoxError> {
