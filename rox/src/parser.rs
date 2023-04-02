@@ -24,17 +24,63 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             if next_token.token_type() == TokenType::Eof {
                 break;
             }
-            match self.statement() {
+            match self.declaration() {
                 Ok(stmt) => statements.push(stmt),
-                Err(e) => eprintln!("{e}"),
+                Err(e) => {
+                    eprintln!("{e}");
+                    self.synchronisze();
+                }
             }
         }
         statements
     }
 
+    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+        let next_token = self.tokens.peek();
+        if next_token.unwrap().token_type() == TokenType::Let {
+            self.tokens.next();
+            self.var_declaration()
+        } else {
+            self.statement()
+        }
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let name = if let Some(token) = self.tokens.next() {
+            token
+        } else {
+            return Err(ParseError::UnexpectedEOF);
+        };
+        if name.token_type() != Identifier {
+            return Err(ParseError::ExpectedToken {
+                token: format!("Identifier"),
+                line: name.line(),
+            });
+        }
+        let mut initializer = None;
+        if let Some(token) = self.tokens.peek() {
+            if token.token_type() == Equal {
+                self.tokens.next();
+                initializer = Some(self.expression()?);
+            }
+        };
+        if let Some(token) = self.tokens.next() {
+            if token.token_type() == SemiColon {
+                Ok(Stmt::VarDecl(stmt_type::VarDecl::new(name, initializer)))
+            } else {
+                Err(ParseError::ExpectedToken {
+                    token: ";".to_string(),
+                    line: token.line(),
+                })
+            }
+        } else {
+            Err(ParseError::UnexpectedEOF)
+        }
+    }
+
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         let next_token = self.tokens.peek();
-        if next_token.is_some() && next_token.unwrap().token_type() == TokenType::Print {
+        if next_token.unwrap().token_type() == TokenType::Print {
             self.tokens.next();
             self.print_stmt()
         } else {
@@ -46,7 +92,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         let expr = self.expression()?;
         let next_token = self.tokens.next();
         if next_token.is_some() && next_token.unwrap().token_type() == TokenType::SemiColon {
-            Ok(Stmt::Print(stmt_type::Print::new(Box::new(expr))))
+            Ok(Stmt::Print(stmt_type::Print::new(expr)))
         } else {
             Err(ParseError::ExpectedToken {
                 token: format!(";"),
@@ -59,7 +105,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         let expr = self.expression()?;
         let next_token = self.tokens.next();
         if next_token.is_some() && next_token.unwrap().token_type() == TokenType::SemiColon {
-            Ok(Stmt::ExprStmt(stmt_type::ExprStmt::new(Box::new(expr))))
+            Ok(Stmt::ExprStmt(stmt_type::ExprStmt::new(expr)))
         } else {
             Err(ParseError::ExpectedToken {
                 token: format!(";"),
@@ -151,6 +197,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
                         Some(_) /* EOF */| None => Err(ParseError::UnexpectedEOF),
                     }
                 }
+                Identifier => Ok(Expr::Variable(Variable::new(token))),
                 Eof => Err(ParseError::UnexpectedEOF),
                 _ => Err(ParseError::UnexpectedToken {
                     token: token.to_string(),
@@ -169,7 +216,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
     fn synchronisze(&mut self) {
         while let Some(token) = self.tokens.next() {
             match token.token_type() {
-                Class | Fun | Var | While | If | Print | Return => (),
+                Class | Fun | Let | While | If | Print | Return => (),
                 _ => self.synchronisze(),
             }
         }
@@ -192,6 +239,7 @@ impl AstPrinter {
                 &format!("Unary :{}", expr.op_lexem()),
                 std::iter::once(expr.ty()),
             ),
+            Expr::Variable(var) => self.parenthesize(var.name(), std::iter::empty::<&Box<Expr>>()),
         }
     }
     fn parenthesize<'a, T: Iterator<Item = &'a Box<Expr>>>(&self, name: &str, exprs: T) -> String {

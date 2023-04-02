@@ -1,33 +1,34 @@
-pub mod error;
-pub mod exprs;
+mod environment;
+mod error;
+mod exprs;
 mod interepreter;
-pub mod parser;
-pub mod scanner;
-pub mod stmts;
+mod parser;
+mod scanner;
+mod stmts;
 
 use error::RoxError;
 use interepreter::Interpreter;
 use std::fs;
 use std::io::{self, BufRead, Write};
 
-fn run(content: String) -> Result<(), RoxError> {
+fn run(content: String, interepreter: &mut Interpreter) -> Result<(), RoxError> {
     let mut scanner = scanner::Scanner::new(content);
     let tokens = scanner.scan_tokens();
     let mut parser = parser::Parser::new(tokens.into_iter());
-    let interepreter = Interpreter;
     let statements = parser.parse();
     match interepreter.interpret(statements) {
         Ok(()) => Ok(()),
         Err(e) => {
-            eprintln!("{e}");
+            eprintln!("{}: {e}", RoxError::RuntimeError);
             return Err(RoxError::RuntimeError);
         }
     }
 }
 
 pub fn run_file(path: String) -> Result<(), RoxError> {
+    let mut interpreter = Interpreter::new();
     let contents = fs::read_to_string(path).unwrap();
-    run(contents)
+    run(contents, &mut interpreter)
 }
 
 pub fn run_prompt() {
@@ -36,14 +37,13 @@ pub fn run_prompt() {
     print!("Rox interactive mode.\n>>> ");
     io::stdout().flush().unwrap();
 
+    let mut interepreter = Interpreter::new();
+
     for line in reader.lock().lines() {
         if let Err(e) = line {
             eprintln!("{e}");
         } else {
-            let res = run(line.unwrap());
-            if let Err(e) = res {
-                eprintln!("Error of type {e} when runing lox scanner");
-            }
+            let _ = run(line.unwrap(), &mut interepreter);
         }
         print!(">>> ");
         io::stdout().flush().unwrap();

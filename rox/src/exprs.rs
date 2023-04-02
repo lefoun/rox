@@ -1,5 +1,5 @@
-use expr_type::*;
 use crate::scanner::{Token, TokenType};
+use expr_type::*;
 
 pub trait ExprVisitor {
     type Value;
@@ -10,6 +10,7 @@ pub trait ExprVisitor {
     fn visit_grouping(&self, expr: expr_type::Grouping) -> Result<Self::Value, Self::Error>;
     fn visit_literal(&self, expr: expr_type::Literal) -> Result<Self::Value, Self::Error>;
     fn visit_unary(&self, expr: expr_type::Unary) -> Result<Self::Value, Self::Error>;
+    fn visit_variable(&self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -18,6 +19,7 @@ pub enum Expr {
     Grouping(Grouping),
     Literal(Literal),
     Unary(Unary),
+    Variable(Variable),
 }
 
 impl Expr {
@@ -27,13 +29,14 @@ impl Expr {
             Self::Literal(e) => e.line(),
             Self::Grouping(e) => e.ty().line(),
             Self::Unary(e) => e.line(),
+            Self::Variable(e) => e.line(),
         }
     }
 }
 
 pub mod expr_type {
     use super::*;
-    #[derive(Debug,Clone)]
+    #[derive(Debug, Clone)]
     pub struct Binary(Box<Expr>, Token, Box<Expr>);
     impl Binary {
         pub fn new(lhs: Box<Expr>, op: Token, rhs: Box<Expr>) -> Self {
@@ -93,7 +96,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug,Clone)]
+    #[derive(Debug, Clone)]
     pub struct Unary(Token, Box<Expr>);
     impl Unary {
         pub fn new(op: Token, rhs: Box<Expr>) -> Self {
@@ -109,6 +112,26 @@ pub mod expr_type {
         }
 
         pub fn op_lexem(&self) -> &str {
+            self.0.lexem()
+        }
+
+        pub fn line(&self) -> usize {
+            self.0.line()
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct Variable(Token);
+    impl Variable {
+        pub fn new(name: Token) -> Self {
+            Self(name)
+        }
+
+        pub fn ty(&self) -> TokenType {
+            self.0.token_type()
+        }
+
+        pub fn name(&self) -> &str {
             self.0.lexem()
         }
 

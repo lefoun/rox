@@ -60,4 +60,7 @@ pub enum RuntimeError {
 
     #[error("Unexpected Unary operator: {op} at line {line}")]
     UnexpectedUnaryOperator { op: String, line: usize },
+
+    #[error("Invalid identifier: {ident} at line {line}")]
+    InvalidIdentifier { ident: String, line: usize },
 }

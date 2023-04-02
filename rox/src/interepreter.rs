@@ -1,7 +1,8 @@
+use crate::environment::Environment;
 use crate::error::RuntimeError::{self, *};
 use crate::exprs::{expr_type, Expr, ExprVisitor};
 use crate::scanner::TokenType::{self, *};
-use crate::stmts::{Stmt, StmtVisitor};
+use crate::stmts::{stmt_type, Stmt, StmtVisitor};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -24,8 +25,8 @@ impl std::fmt::Display for Value {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-struct Object {
+#[derive(Clone, PartialEq, Debug, Default)]
+pub struct Object {
     identifier: String,
     ty: String,
     parent: String,
@@ -33,17 +34,25 @@ struct Object {
     var_members: Vec<String>,
 }
 
-pub struct Interpreter;
+pub struct Interpreter {
+    env: Environment,
+}
 
 impl Interpreter {
-    pub fn interpret(&self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
+    pub fn new() -> Self {
+        Self {
+            env: Environment::new(),
+        }
+    }
+
+    pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
         for stmt in stmts {
             self.execute(stmt)?;
         }
         Ok(())
     }
 
-    fn execute(&self, stmt: Stmt) -> Result<(), RuntimeError> {
+    fn execute(&mut self, stmt: Stmt) -> Result<(), RuntimeError> {
         StmtVisitor::accept(self, stmt)?;
         Ok(())
     }
@@ -92,10 +101,11 @@ impl StmtVisitor for Interpreter {
     type Value = ();
     type Error = RuntimeError;
 
-    fn accept(&self, stmt: Stmt) -> Result<Self::Value, Self::Error> {
+    fn accept(&mut self, stmt: Stmt) -> Result<Self::Value, Self::Error> {
         match stmt {
             Stmt::Print(s) => self.visit_print_stmt(s),
             Stmt::ExprStmt(s) => self.visit_expr_stmt(s),
+            Stmt::VarDecl(s) => self.visit_var_stmt(s),
         }
     }
 
@@ -103,7 +113,7 @@ impl StmtVisitor for Interpreter {
         &self,
         stmt: crate::stmts::stmt_type::ExprStmt,
     ) -> Result<Self::Value, Self::Error> {
-        ExprVisitor::accept(self, *(stmt.value().clone()))?;
+        ExprVisitor::accept(self, stmt.value().clone())?;
         Ok(())
     }
 
@@ -111,8 +121,18 @@ impl StmtVisitor for Interpreter {
         &self,
         stmt: crate::stmts::stmt_type::Print,
     ) -> Result<Self::Value, Self::Error> {
-        let v = ExprVisitor::accept(self, *(stmt.value().clone()))?;
+        let v = ExprVisitor::accept(self, stmt.value().clone())?;
         println!("{v}");
+        Ok(())
+    }
+
+    fn visit_var_stmt(&mut self, stmt: stmt_type::VarDecl) -> Result<Self::Value, Self::Error> {
+        let mut value = Value::Null;
+
+        if let Some(expr) = stmt.ty() {
+            value = <Self as ExprVisitor>::accept(self, expr.to_owned())?;
+        }
+        self.env.define(stmt.name().to_owned(), value);
         Ok(())
     }
 }
@@ -127,6 +147,7 @@ impl ExprVisitor for Interpreter {
             Expr::Grouping(expr) => self.visit_grouping(expr),
             Expr::Unary(expr) => self.visit_unary(expr),
             Expr::Literal(expr) => self.visit_literal(expr),
+            Expr::Variable(expr) => self.visit_variable(expr),
         }
     }
 
@@ -288,5 +309,15 @@ impl ExprVisitor for Interpreter {
                 })
             }
         })
+    }
+
+    fn visit_variable(&self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error> {
+        match self.env.get(expr.name()) {
+            Some(val) => Ok(val.clone()),
+            None => Err(RuntimeError::InvalidIdentifier {
+                ident: expr.name().to_string(),
+                line: expr.line(),
+            }),
+        }
     }
 }

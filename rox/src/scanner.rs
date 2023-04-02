@@ -31,7 +31,7 @@ impl Scanner {
             ("super", Super),
             ("this", This),
             ("true", True),
-            ("var", Var),
+            ("let", Let),
             ("while", While),
         ]
         .into_iter()
@@ -185,7 +185,7 @@ impl Scanner {
             // it means we reached EOF before closing the string
             self.error('"');
         } else {
-            self.current += s.len() + 1; // + 1 for the other ' " '
+            self.current += s.len(); // + 1 for the other ' " '
             self.tokens
                 .push(Token::new(TokenType::RoxString(s.clone()), self.line, s))
         }
@@ -246,7 +246,7 @@ pub enum TokenType {
     Super,
     This,
     True,
-    Var,
+    Let,
     While,
 
     Invalid,
