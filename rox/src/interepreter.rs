@@ -41,7 +41,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            env: Environment::new(),
+            env: Environment::new(None),
         }
     }
 
@@ -55,6 +55,14 @@ impl Interpreter {
     fn execute(&mut self, stmt: Stmt) -> Result<(), RuntimeError> {
         StmtVisitor::accept(self, stmt)?;
         Ok(())
+    }
+
+    fn assign(&mut self, name: String, value: Value) -> Result<(), RuntimeError> {
+        if self.env.assign(name.clone(), value).is_some() {
+            Ok(())
+        } else {
+            Err(InvalidIdentifier { ident: name })
+        }
     }
 
     fn token_type_matches(ty: &TokenType, typs: &[TokenType]) -> bool {
@@ -110,7 +118,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_expr_stmt(
-        &self,
+        &mut self,
         stmt: crate::stmts::stmt_type::ExprStmt,
     ) -> Result<Self::Value, Self::Error> {
         ExprVisitor::accept(self, stmt.value().clone())?;
@@ -118,7 +126,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_print_stmt(
-        &self,
+        &mut self,
         stmt: crate::stmts::stmt_type::Print,
     ) -> Result<Self::Value, Self::Error> {
         let v = ExprVisitor::accept(self, stmt.value().clone())?;
@@ -141,17 +149,18 @@ impl ExprVisitor for Interpreter {
     type Value = Value;
     type Error = RuntimeError;
 
-    fn accept(&self, expr: Expr) -> Result<Self::Value, Self::Error> {
+    fn accept(&mut self, expr: Expr) -> Result<Self::Value, Self::Error> {
         match expr {
             Expr::Binary(expr) => self.visit_binary(expr),
             Expr::Grouping(expr) => self.visit_grouping(expr),
             Expr::Unary(expr) => self.visit_unary(expr),
             Expr::Literal(expr) => self.visit_literal(expr),
             Expr::Variable(expr) => self.visit_variable(expr),
+            Expr::Assignment(expr) => self.visit_assignment(expr),
         }
     }
 
-    fn visit_literal(&self, expr: expr_type::Literal) -> Result<Self::Value, Self::Error> {
+    fn visit_literal(&mut self, expr: expr_type::Literal) -> Result<Self::Value, Self::Error> {
         Ok(match expr.ty() {
             Null => Value::Null,
             Number(num) => Value::Number(num),
@@ -161,16 +170,15 @@ impl ExprVisitor for Interpreter {
             _ => {
                 return Err(ExpectedLiteral {
                     token: expr.lexem().to_owned(),
-                    line: expr.line(),
                 })
             }
         })
     }
 
-    fn visit_binary(&self, expr: expr_type::Binary) -> Result<Self::Value, Self::Error> {
-        let left = ExprVisitor::accept(self, *expr.lhs().clone())?;
+    fn visit_binary(&mut self, expr: expr_type::Binary) -> Result<Self::Value, Self::Error> {
+        let left = ExprVisitor::accept(self, expr.lhs().clone())?;
         let op = expr.op_ty();
-        let right = ExprVisitor::accept(self, *expr.rhs().clone())?;
+        let right = ExprVisitor::accept(self, expr.rhs().clone())?;
 
         if !Self::token_type_matches(
             &op,
@@ -188,8 +196,7 @@ impl ExprVisitor for Interpreter {
             ],
         ) {
             return Err(UnsupportedBinaryOperator {
-                op: expr.op_lexem().to_owned(),
-                line: expr.line(),
+                op: expr.operator_lexem().to_owned(),
             });
         }
 
@@ -199,8 +206,7 @@ impl ExprVisitor for Interpreter {
                 other => {
                     return Err(InvalidOperand {
                         operand: other.to_string(),
-                        line: expr.line(),
-                        expr_type: expr.op_lexem().to_owned(),
+                        expr_type: expr.operator_lexem().to_owned(),
                     })
                 }
             },
@@ -212,15 +218,13 @@ impl ExprVisitor for Interpreter {
                     }
                     _ => {
                         return Err(UnsupportedBinaryOperator {
-                            op: expr.op_lexem().to_owned(),
-                            line: expr.line(),
+                            op: expr.operator_lexem().to_owned(),
                         })
                     }
                 },
                 _ => {
                     return Err(UnsupportedBinaryOperator {
-                        op: expr.op_lexem().to_owned(),
-                        line: expr.line(),
+                        op: expr.operator_lexem().to_owned(),
                     })
                 }
             },
@@ -229,8 +233,7 @@ impl ExprVisitor for Interpreter {
                     DoubleEqual | BangEqual => Self::eq_op(lhs, rhs, &op),
                     _ => {
                         return Err(UnsupportedBinaryOperator {
-                            op: expr.op_lexem().to_owned(),
-                            line: expr.line(),
+                            op: expr.operator_lexem().to_owned(),
                         })
                     }
                 },
@@ -238,8 +241,7 @@ impl ExprVisitor for Interpreter {
                     DoubleEqual | BangEqual => Self::eq_op(lhs, false, &op),
                     _ => {
                         return Err(UnsupportedBinaryOperator {
-                            op: expr.op_lexem().to_owned(),
-                            line: expr.line(),
+                            op: expr.operator_lexem().to_owned(),
                         })
                     }
                 },
@@ -247,8 +249,7 @@ impl ExprVisitor for Interpreter {
                     return Err(InvalidOperands {
                         lhs: lhs.to_string(),
                         rhs: other.to_string(),
-                        expr_type: expr.op_lexem().to_owned(),
-                        line: expr.line(),
+                        expr_type: expr.operator_lexem().to_owned(),
                     })
                 }
             },
@@ -259,36 +260,33 @@ impl ExprVisitor for Interpreter {
                     return Err(InvalidOperands {
                         lhs: Value::Null.to_string(),
                         rhs: other.to_string(),
-                        expr_type: expr.op_lexem().to_owned(),
-                        line: expr.line(),
+                        expr_type: expr.operator_lexem().to_owned(),
                     })
                 }
             },
             other => {
                 return Err(InvalidOperand {
                     operand: other.to_string(),
-                    line: expr.line(),
-                    expr_type: expr.op_lexem().to_owned(),
+                    expr_type: expr.operator_lexem().to_owned(),
                 })
             }
         })
     }
 
-    fn visit_grouping(&self, expr: expr_type::Grouping) -> Result<Self::Value, Self::Error> {
-        ExprVisitor::accept(self, *expr.ty().clone())
+    fn visit_grouping(&mut self, expr: expr_type::Grouping) -> Result<Self::Value, Self::Error> {
+        ExprVisitor::accept(self, expr.ty().clone())
     }
 
-    fn visit_unary(&self, expr: expr_type::Unary) -> Result<Self::Value, Self::Error> {
-        let v = ExprVisitor::accept(self, *expr.ty().clone())?;
-        Ok(match expr.op_ty() {
+    fn visit_unary(&mut self, expr: expr_type::Unary) -> Result<Self::Value, Self::Error> {
+        let v = ExprVisitor::accept(self, expr.expr().clone())?;
+        Ok(match expr.operator_ty() {
             Bang => match v {
                 Value::Bool(value) => Value::Bool(!value),
                 Value::Null => Value::Bool(true),
                 other => {
                     return Err(InvalidOperand {
                         operand: other.to_string(),
-                        line: expr.line(),
-                        expr_type: expr.op_lexem().to_owned(),
+                        expr_type: expr.operator_lexem().to_owned(),
                     })
                 }
             },
@@ -297,27 +295,34 @@ impl ExprVisitor for Interpreter {
                 other => {
                     return Err(InvalidOperand {
                         operand: other.to_string(),
-                        line: expr.line(),
-                        expr_type: expr.op_lexem().to_owned(),
+                        expr_type: expr.operator_lexem().to_owned(),
                     })
                 }
             },
             _ => {
                 return Err(UnexpectedUnaryOperator {
-                    op: expr.op_lexem().to_owned(),
-                    line: expr.line(),
+                    op: expr.operator_lexem().to_owned(),
                 })
             }
         })
     }
 
-    fn visit_variable(&self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error> {
+    fn visit_variable(&mut self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error> {
         match self.env.get(expr.name()) {
             Some(val) => Ok(val.clone()),
-            None => Err(RuntimeError::InvalidIdentifier {
+            None => Err(InvalidIdentifier {
                 ident: expr.name().to_string(),
-                line: expr.line(),
             }),
         }
+    }
+
+    fn visit_assignment(
+        &mut self,
+        expr: expr_type::Assignment,
+    ) -> Result<Self::Value, Self::Error> {
+        let name = expr.name().to_owned();
+        let value = ExprVisitor::accept(self, expr.ty().clone())?;
+        self.assign(name, value.clone())?;
+        Ok(value)
     }
 }

@@ -7,8 +7,8 @@ pub trait StmtVisitor {
     type Error;
 
     fn accept(&mut self, stmt: Stmt) -> Result<Self::Value, Self::Error>;
-    fn visit_print_stmt(&self, stmt: stmt_type::Print) -> Result<Self::Value, Self::Error>;
-    fn visit_expr_stmt(&self, stmt: stmt_type::ExprStmt) -> Result<Self::Value, Self::Error>;
+    fn visit_print_stmt(&mut self, stmt: stmt_type::Print) -> Result<Self::Value, Self::Error>;
+    fn visit_expr_stmt(&mut self, stmt: stmt_type::ExprStmt) -> Result<Self::Value, Self::Error>;
     fn visit_var_stmt(&mut self, stmt: stmt_type::VarDecl) -> Result<Self::Value, Self::Error>;
 }
 
@@ -17,6 +17,20 @@ pub enum Stmt {
     Print(Print),
     ExprStmt(ExprStmt),
     VarDecl(VarDecl),
+}
+
+impl Stmt {
+    pub fn new_print(value: Expr) -> Self {
+        Self::Print(stmt_type::Print::new(value))
+    }
+
+    pub fn new_expr_stmt(value: Expr) -> Self {
+        Self::ExprStmt(stmt_type::ExprStmt::new(value))
+    }
+
+    pub fn new_var_decl(name: Token, initializer: Option<Expr>) -> Self {
+        Self::VarDecl(stmt_type::VarDecl::new(name, initializer))
+    }
 }
 
 pub mod stmt_type {
@@ -48,8 +62,8 @@ pub mod stmt_type {
     #[derive(Clone, Debug)]
     pub struct VarDecl(Token, Option<Expr>);
     impl VarDecl {
-        pub fn new(name: Token, intitializer: Option<Expr>) -> Self {
-            Self(name, intitializer)
+        pub fn new(name: Token, initializer: Option<Expr>) -> Self {
+            Self(name, initializer)
         }
 
         pub fn ty(&self) -> Option<&Expr> {
@@ -58,10 +72,6 @@ pub mod stmt_type {
 
         pub fn name(&self) -> &str {
             self.0.lexem()
-        }
-
-        pub fn line(&self) -> usize {
-            self.0.line()
         }
     }
 }

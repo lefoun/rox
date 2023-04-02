@@ -5,12 +5,14 @@ pub trait ExprVisitor {
     type Value;
     type Error;
 
-    fn accept(&self, expr: Expr) -> Result<Self::Value, Self::Error>;
-    fn visit_binary(&self, expr: expr_type::Binary) -> Result<Self::Value, Self::Error>;
-    fn visit_grouping(&self, expr: expr_type::Grouping) -> Result<Self::Value, Self::Error>;
-    fn visit_literal(&self, expr: expr_type::Literal) -> Result<Self::Value, Self::Error>;
-    fn visit_unary(&self, expr: expr_type::Unary) -> Result<Self::Value, Self::Error>;
-    fn visit_variable(&self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error>;
+    fn accept(&mut self, expr: Expr) -> Result<Self::Value, Self::Error>;
+    fn visit_binary(&mut self, expr: expr_type::Binary) -> Result<Self::Value, Self::Error>;
+    fn visit_grouping(&mut self, expr: expr_type::Grouping) -> Result<Self::Value, Self::Error>;
+    fn visit_literal(&mut self, expr: expr_type::Literal) -> Result<Self::Value, Self::Error>;
+    fn visit_unary(&mut self, expr: expr_type::Unary) -> Result<Self::Value, Self::Error>;
+    fn visit_variable(&mut self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error>;
+    fn visit_assignment(&mut self, expr: expr_type::Assignment)
+        -> Result<Self::Value, Self::Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -20,17 +22,32 @@ pub enum Expr {
     Literal(Literal),
     Unary(Unary),
     Variable(Variable),
+    Assignment(Assignment),
 }
 
 impl Expr {
-    pub fn line(&self) -> usize {
-        match &self {
-            Self::Binary(e) => e.line(),
-            Self::Literal(e) => e.line(),
-            Self::Grouping(e) => e.ty().line(),
-            Self::Unary(e) => e.line(),
-            Self::Variable(e) => e.line(),
-        }
+    pub fn new_binary(lhs: Expr, op: Token, rhs: Expr) -> Self {
+        Self::Binary(expr_type::Binary::new(lhs, op, rhs))
+    }
+
+    pub fn new_literal(tkn: Token) -> Self {
+        Self::Literal(expr_type::Literal::new(tkn))
+    }
+
+    pub fn new_grouping(expr: Expr) -> Self {
+        Self::Grouping(expr_type::Grouping::new(expr))
+    }
+
+    pub fn new_unary(op: Token, expr: Expr) -> Self {
+        Self::Unary(expr_type::Unary::new(op, expr))
+    }
+
+    pub fn new_variable(name: &str) -> Self {
+        Self::Variable(expr_type::Variable::new(name))
+    }
+
+    pub fn new_assignment(name: &str, expr: Expr) -> Self {
+        Self::Assignment(expr_type::Assignment::new(name, expr))
     }
 }
 
@@ -39,15 +56,15 @@ pub mod expr_type {
     #[derive(Debug, Clone)]
     pub struct Binary(Box<Expr>, Token, Box<Expr>);
     impl Binary {
-        pub fn new(lhs: Box<Expr>, op: Token, rhs: Box<Expr>) -> Self {
-            Self(lhs, op, rhs)
+        pub fn new(lhs: Expr, op: Token, rhs: Expr) -> Self {
+            Self(Box::new(lhs), op, Box::new(rhs))
         }
 
-        pub fn lhs(&self) -> &Box<Expr> {
+        pub fn lhs(&self) -> &Expr {
             &self.0
         }
 
-        pub fn rhs(&self) -> &Box<Expr> {
+        pub fn rhs(&self) -> &Expr {
             &self.2
         }
 
@@ -55,23 +72,19 @@ pub mod expr_type {
             self.1.token_type()
         }
 
-        pub fn op_lexem(&self) -> &str {
+        pub fn operator_lexem(&self) -> &str {
             self.1.lexem()
-        }
-
-        pub fn line(&self) -> usize {
-            self.1.line()
         }
     }
 
     #[derive(Debug, Clone)]
     pub struct Grouping(Box<Expr>);
     impl Grouping {
-        pub fn new(expr: Box<Expr>) -> Self {
-            Self(expr)
+        pub fn new(expr: Expr) -> Self {
+            Self(Box::new(expr))
         }
 
-        pub fn ty(&self) -> &Box<Expr> {
+        pub fn ty(&self) -> &Expr {
             &self.0
         }
     }
@@ -87,10 +100,6 @@ pub mod expr_type {
             self.0.token_type()
         }
 
-        pub fn line(&self) -> usize {
-            self.0.line()
-        }
-
         pub fn lexem(&self) -> &str {
             self.0.lexem()
         }
@@ -99,44 +108,48 @@ pub mod expr_type {
     #[derive(Debug, Clone)]
     pub struct Unary(Token, Box<Expr>);
     impl Unary {
-        pub fn new(op: Token, rhs: Box<Expr>) -> Self {
-            Self(op, rhs)
+        pub fn new(op: Token, rhs: Expr) -> Self {
+            Self(op, Box::new(rhs))
         }
 
-        pub fn op_ty(&self) -> TokenType {
+        pub fn operator_ty(&self) -> TokenType {
             self.0.token_type()
         }
 
-        pub fn ty(&self) -> &Box<Expr> {
+        pub fn expr(&self) -> &Expr {
             &self.1
         }
 
-        pub fn op_lexem(&self) -> &str {
+        pub fn operator_lexem(&self) -> &str {
             self.0.lexem()
-        }
-
-        pub fn line(&self) -> usize {
-            self.0.line()
         }
     }
 
     #[derive(Debug, Clone)]
-    pub struct Variable(Token);
+    pub struct Variable(String);
     impl Variable {
-        pub fn new(name: Token) -> Self {
-            Self(name)
-        }
-
-        pub fn ty(&self) -> TokenType {
-            self.0.token_type()
+        pub fn new(name: &str) -> Self {
+            Self(name.to_owned())
         }
 
         pub fn name(&self) -> &str {
-            self.0.lexem()
+            &self.0
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct Assignment(String, Box<Expr>);
+    impl Assignment {
+        pub fn new(name: &str, expr: Expr) -> Self {
+            Self(name.to_owned(), Box::new(expr))
         }
 
-        pub fn line(&self) -> usize {
-            self.0.line()
+        pub fn ty(&self) -> &Expr {
+            &self.1
+        }
+
+        pub fn name(&self) -> &str {
+            &self.0
         }
     }
 }

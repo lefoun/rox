@@ -22,45 +22,43 @@ pub enum ScanError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParseError {
-    #[error("Parse error at line: {line} Unexpected token {token}")]
-    UnexpectedToken { token: String, line: usize },
+    #[error("Parse error: Unexpected token {token}")]
+    UnexpectedToken { token: String },
 
     #[error("Parse error: Unexpected end of file")]
     UnexpectedEOF,
 
-    #[error("Parse error at line: {line} Expected token {token}")]
-    ExpectedToken { token: String, line: usize },
+    #[error("Parse error: Expected token {token}")]
+    ExpectedToken { token: String },
 
-    #[error("Parse error at line: {line}")]
-    BadOperand { msg: String, line: usize },
+    #[error("Parse error {msg}")]
+    BadOperand { msg: String },
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeError {
-    #[error("Inavlid Operand {operand} for {expr_type} expression at line: {line}")]
-    InvalidOperand {
-        operand: String,
-        line: usize,
-        expr_type: String,
-    },
+    #[error("Inavlid Operand {operand} for {expr_type} expression")]
+    InvalidOperand { operand: String, expr_type: String },
 
-    #[error("Inavlid Operands lhs: {lhs} rhs: {rhs} for {expr_type} expression at line: {line}")]
+    #[error("Inavlid Operands lhs: {lhs} rhs: {rhs} for {expr_type} expression")]
     InvalidOperands {
         lhs: String,
         rhs: String,
         expr_type: String,
-        line: usize,
     },
 
-    #[error("Invalid expression: Expected literal got {token} at line {line}")]
-    ExpectedLiteral { token: String, line: usize },
+    #[error("Invalid expression: Expected literal got {token}")]
+    ExpectedLiteral { token: String },
 
-    #[error("Unsupported binary operator: {op} at line {line}")]
-    UnsupportedBinaryOperator { op: String, line: usize },
+    #[error("Unsupported binary operator: {op}")]
+    UnsupportedBinaryOperator { op: String },
 
-    #[error("Unexpected Unary operator: {op} at line {line}")]
-    UnexpectedUnaryOperator { op: String, line: usize },
+    #[error("Unexpected Unary operator: {op}")]
+    UnexpectedUnaryOperator { op: String },
 
-    #[error("Invalid identifier: {ident} at line {line}")]
-    InvalidIdentifier { ident: String, line: usize },
+    #[error("Invalid identifier: {ident}")]
+    InvalidIdentifier { ident: String },
+
+    #[error("Undefined identifier: {ident}")]
+    UndefinedIdentifier { ident: String },
 }

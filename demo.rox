@@ -1,4 +1,7 @@
-print "1 + 2";
-print 1 + 2;
-print "Hello, world!";
-print "This is a demo of rox!";
+let name = "Rox";
+let type = "Programming language";
+print name + " is a " + type + "!";
+
+let a = 42;
+let b = 0.42;
+print a + b * a - b / 2;
