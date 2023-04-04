@@ -4,17 +4,19 @@ use crate::scanner::{
     Token,
     TokenType::{self, *},
 };
-use crate::stmts::{stmt_type, Stmt};
+use crate::stmts::Stmt;
 use std::iter::Peekable;
 
 pub struct Parser<T: Iterator<Item = Token>> {
     tokens: Peekable<T>,
+    repl_mode: bool,
 }
 
 impl<T: Iterator<Item = Token>> Parser<T> {
-    pub fn new(tokens: T) -> Self {
+    pub fn new(tokens: T, repl_mode: bool) -> Self {
         Self {
             tokens: tokens.peekable(),
+            repl_mode,
         }
     }
 
@@ -79,7 +81,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         while !self.is_at_end() && !self.next_matches(&[RightBrace])? {
             stmts.push(self.declaration()?);
         }
-        
+
         Ok(stmts)
     }
 
@@ -96,12 +98,17 @@ impl<T: Iterator<Item = Token>> Parser<T> {
 
     fn statement_expr(&mut self) -> Result<Stmt, ParseError> {
         let expr = self.expression()?;
-        if self.next_matches(&[SemiColon])? {
-            Ok(Stmt::new_expr_stmt(expr))
-        } else {
-            Err(ParseError::ExpectedToken {
+
+        match self.next_matches(&[SemiColon]) {
+            Ok(true) => Ok(Stmt::new_expr_stmt(expr)),
+            Ok(false) if Self::matches(self.tokens.peek().unwrap(), &[Eof]) && self.repl_mode => {
+                Ok(Stmt::new_print(expr))
+            }
+            Ok(false) => Err(ParseError::ExpectedToken {
                 token: format!(";"),
-            })
+            }),
+
+            Err(e) => Err(e),
         }
     }
 

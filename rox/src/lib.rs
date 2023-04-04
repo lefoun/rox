@@ -11,12 +11,12 @@ use interepreter::Interpreter;
 use std::fs;
 use std::io::{self, BufRead, Write};
 
-fn run(content: String, interepreter: &mut Interpreter) -> Result<(), RoxError> {
+fn run(content: String, interepreter: &mut Interpreter, repl_mode: bool) -> Result<(), RoxError> {
     let mut scanner = scanner::Scanner::new(content);
     let tokens = scanner.scan_tokens();
-    let mut parser = parser::Parser::new(tokens.into_iter());
+    let mut parser = parser::Parser::new(tokens.into_iter(), repl_mode);
     let statements = parser.parse();
-    match interepreter.interpret(statements) {
+    match interepreter.interpret_stmt(statements) {
         Ok(()) => Ok(()),
         Err(e) => {
             eprintln!("{}: {e}", RoxError::RuntimeError);
@@ -28,7 +28,7 @@ fn run(content: String, interepreter: &mut Interpreter) -> Result<(), RoxError> 
 pub fn run_file(path: String) -> Result<(), RoxError> {
     let mut interpreter = Interpreter::new();
     let contents = fs::read_to_string(path).unwrap();
-    run(contents, &mut interpreter)
+    run(contents, &mut interpreter, false)
 }
 
 pub fn run_prompt() {
@@ -43,7 +43,7 @@ pub fn run_prompt() {
         if let Err(e) = line {
             eprintln!("{e}");
         } else {
-            let _ = run(line.unwrap(), &mut interepreter);
+            let _ = run(line.unwrap(), &mut interepreter, true);
         }
         print!(">>> ");
         io::stdout().flush().unwrap();
