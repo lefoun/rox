@@ -3,6 +3,7 @@ use crate::error::RuntimeError::{self, *};
 use crate::exprs::{expr_type, Expr, ExprVisitor};
 use crate::scanner::TokenType::{self, *};
 use crate::stmts::{stmt_type, Stmt, StmtVisitor};
+use std::collections::VecDeque;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -35,14 +36,14 @@ pub struct Object {
 }
 
 pub struct Interpreter {
-    env: Environment,
+    env: VecDeque<Environment>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {
-            env: Environment::new(None),
-        }
+        let mut env = VecDeque::new();
+        env.push_front(Environment::new());
+        Self { env }
     }
 
     pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
@@ -57,12 +58,37 @@ impl Interpreter {
         Ok(())
     }
 
-    fn assign(&mut self, name: String, value: Value) -> Result<(), RuntimeError> {
-        if self.env.assign(name.clone(), value).is_some() {
-            Ok(())
-        } else {
-            Err(InvalidIdentifier { ident: name })
+    fn assign_var(&mut self, name: String, value: Value) -> Result<(), RuntimeError> {
+        for env in &mut self.env {
+            if env.get(&name).is_some() {
+                env.define(name, value.clone());
+                return Ok(());
+            }
         }
+        Err(RuntimeError::UndefinedVariable { ident: name })
+    }
+
+    fn define_var(&mut self, name: String, value: Value) {
+        self.env.front_mut().unwrap().define(name, value.clone());
+    }
+
+    fn get_var(&mut self, name: &str) -> Result<Value, RuntimeError> {
+        for env in &self.env {
+            if env.get(&name).is_some() {
+                return Ok(env.get(&name).unwrap().clone());
+            }
+        }
+        Err(RuntimeError::UndefinedVariable {
+            ident: name.to_owned(),
+        })
+    }
+
+    fn add_new_environment(&mut self) {
+        self.env.push_front(Environment::new());
+        }
+
+    fn pop_environment(&mut self) {
+        self.env.pop_front();
     }
 
     fn token_type_matches(ty: &TokenType, typs: &[TokenType]) -> bool {
@@ -140,7 +166,9 @@ impl StmtVisitor for Interpreter {
         if let Some(expr) = stmt.ty() {
             value = <Self as ExprVisitor>::accept(self, expr.to_owned())?;
         }
-        self.env.define(stmt.name().to_owned(), value);
+        self.define_var(stmt.name().to_owned(), value);
+        Ok(())
+    }
         Ok(())
     }
 }
@@ -308,12 +336,7 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_variable(&mut self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error> {
-        match self.env.get(expr.name()) {
-            Some(val) => Ok(val.clone()),
-            None => Err(InvalidIdentifier {
-                ident: expr.name().to_string(),
-            }),
-        }
+        self.get_var(expr.name())
     }
 
     fn visit_assignment(
@@ -322,7 +345,7 @@ impl ExprVisitor for Interpreter {
     ) -> Result<Self::Value, Self::Error> {
         let name = expr.name().to_owned();
         let value = ExprVisitor::accept(self, expr.ty().clone())?;
-        self.assign(name, value.clone())?;
+        self.assign_var(name, value.clone())?;
         Ok(value)
     }
 }

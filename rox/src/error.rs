@@ -61,4 +61,7 @@ pub enum RuntimeError {
 
     #[error("Undefined identifier: {ident}")]
     UndefinedIdentifier { ident: String },
+
+    #[error("Undefined variable: {ident}")]
+    UndefinedVariable { ident: String },
 }
