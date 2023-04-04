@@ -4,7 +4,7 @@ use crate::scanner::{
     Token,
     TokenType::{self, *},
 };
-use crate::stmts::Stmt;
+use crate::stmts::{stmt_type, Stmt};
 use std::iter::Peekable;
 
 pub struct Parser<T: Iterator<Item = Token>> {
@@ -51,7 +51,6 @@ impl<T: Iterator<Item = Token>> Parser<T> {
                 token: format!("Identifier"),
             });
         };
-        dbg!(name.lexem());
         let mut initializer = None;
         if self.next_matches(&[Equal])? {
             initializer = Some(self.expression()?);
@@ -68,9 +67,20 @@ impl<T: Iterator<Item = Token>> Parser<T> {
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         if self.next_matches(&[Print])? {
             self.print_stmt()
+        } else if self.next_matches(&[LeftBrace])? {
+            Ok(Stmt::new_block(self.block()?))
         } else {
             self.statement_expr()
         }
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        let mut stmts = Vec::new();
+        while !self.is_at_end() && !self.next_matches(&[RightBrace])? {
+            stmts.push(self.declaration()?);
+        }
+        
+        Ok(stmts)
     }
 
     fn print_stmt(&mut self) -> Result<Stmt, ParseError> {
@@ -218,6 +228,12 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         } else {
             Ok(false)
         }
+    }
+
+    fn is_at_end(&mut self) -> bool {
+        self.tokens
+            .peek()
+            .map_or(true, |token| token.token_type() == Eof)
     }
 
     fn synchronisze(&mut self) {

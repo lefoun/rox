@@ -1,8 +1,9 @@
 # Production rules
-program         -> statement* EOF ;
+program         -> declaration* EOF ;
 declaration     -> varDecl | statement ;
 varDecl         -> "let" IDENTIFIER ( "=" expression )? ";" ;
-statement       -> printStmt | exprStmt ;
+statement       -> printStmt | exprStmt | block;
+block           -> "{" declaration * "}" ;
 exprStmt        -> expression ";" ;
 printStmt       -> "print" expression ";" ;
 expression      -> assignment ;

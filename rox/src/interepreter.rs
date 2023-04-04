@@ -85,7 +85,7 @@ impl Interpreter {
 
     fn add_new_environment(&mut self) {
         self.env.push_front(Environment::new());
-        }
+    }
 
     fn pop_environment(&mut self) {
         self.env.pop_front();
@@ -140,6 +140,7 @@ impl StmtVisitor for Interpreter {
             Stmt::Print(s) => self.visit_print_stmt(s),
             Stmt::ExprStmt(s) => self.visit_expr_stmt(s),
             Stmt::VarDecl(s) => self.visit_var_stmt(s),
+            Stmt::Block(s) => self.visit_block(s),
         }
     }
 
@@ -169,6 +170,15 @@ impl StmtVisitor for Interpreter {
         self.define_var(stmt.name().to_owned(), value);
         Ok(())
     }
+
+    fn visit_block(&mut self, stmt: stmt_type::Block) -> Result<Self::Value, Self::Error> {
+        self.add_new_environment();
+
+        for stmt in stmt.stmts() {
+            self.execute(stmt.to_owned())?;
+        }
+
+        self.pop_environment();
         Ok(())
     }
 }

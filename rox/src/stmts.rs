@@ -10,6 +10,7 @@ pub trait StmtVisitor {
     fn visit_print_stmt(&mut self, stmt: stmt_type::Print) -> Result<Self::Value, Self::Error>;
     fn visit_expr_stmt(&mut self, stmt: stmt_type::ExprStmt) -> Result<Self::Value, Self::Error>;
     fn visit_var_stmt(&mut self, stmt: stmt_type::VarDecl) -> Result<Self::Value, Self::Error>;
+    fn visit_block(&mut self, stmt: stmt_type::Block) -> Result<Self::Value, Self::Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -17,6 +18,7 @@ pub enum Stmt {
     Print(Print),
     ExprStmt(ExprStmt),
     VarDecl(VarDecl),
+    Block(Block),
 }
 
 impl Stmt {
@@ -30,6 +32,10 @@ impl Stmt {
 
     pub fn new_var_decl(name: Token, initializer: Option<Expr>) -> Self {
         Self::VarDecl(stmt_type::VarDecl::new(name, initializer))
+    }
+
+    pub fn new_block(stmts: Vec<Stmt>) -> Self {
+        Self::Block(stmt_type::Block::new(stmts))
     }
 }
 
@@ -72,6 +78,18 @@ pub mod stmt_type {
 
         pub fn name(&self) -> &str {
             self.0.lexem()
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct Block(Vec<Stmt>);
+    impl Block {
+        pub fn new(stmts: Vec<Stmt>) -> Self {
+            Self(stmts)
+        }
+
+        pub fn stmts(&self) -> &[Stmt] {
+            &self.0
         }
     }
 }
