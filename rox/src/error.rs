@@ -64,4 +64,7 @@ pub enum RuntimeError {
 
     #[error("Undefined variable: {ident}")]
     UndefinedVariable { ident: String },
+
+    #[error("Unintitialized variable : {ident}")]
+    UninitializedVariable { ident: String },
 }

@@ -12,6 +12,7 @@ pub enum Value {
     Number(f64),
     Object(Object),
     Str(String),
+    Uninitialized,
 }
 
 impl std::fmt::Display for Value {
@@ -22,6 +23,7 @@ impl std::fmt::Display for Value {
             Self::Number(num) => write!(f, "{num}"),
             Self::Str(str) => write!(f, "{str}"),
             Self::Object(obj) => write!(f, "{}", obj.identifier),
+            Self::Uninitialized => write!(f, "Uninitialized"),
         }
     }
 }
@@ -162,7 +164,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_var_stmt(&mut self, stmt: stmt_type::VarDecl) -> Result<Self::Value, Self::Error> {
-        let mut value = Value::Null;
+        let mut value = Value::Uninitialized;
 
         if let Some(expr) = stmt.ty() {
             value = <Self as ExprVisitor>::accept(self, expr.to_owned())?;
@@ -346,7 +348,14 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_variable(&mut self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error> {
-        self.get_var(expr.name())
+        let var = self.get_var(expr.name())?;
+        if var == Value::Uninitialized {
+            return Err(UninitializedVariable {
+                ident: expr.name().to_owned(),
+            });
+        } else {
+            Ok(var)
+        }
     }
 
     fn visit_assignment(
