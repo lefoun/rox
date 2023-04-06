@@ -67,4 +67,7 @@ pub enum RuntimeError {
 
     #[error("Unintitialized variable : {ident}")]
     UninitializedVariable { ident: String },
+
+    #[error("Expected boolean value as condition for conditional statement")]
+    ExpectedBooleanCondition,
 }

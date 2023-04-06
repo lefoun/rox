@@ -11,6 +11,7 @@ pub trait StmtVisitor {
     fn visit_expr_stmt(&mut self, stmt: stmt_type::ExprStmt) -> Result<Self::Value, Self::Error>;
     fn visit_var_stmt(&mut self, stmt: stmt_type::VarDecl) -> Result<Self::Value, Self::Error>;
     fn visit_block(&mut self, stmt: stmt_type::Block) -> Result<Self::Value, Self::Error>;
+    fn visit_if_stmt(&mut self, stmt: stmt_type::IfStmt) -> Result<Self::Value, Self::Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -19,6 +20,7 @@ pub enum Stmt {
     ExprStmt(ExprStmt),
     VarDecl(VarDecl),
     Block(Block),
+    IfStmt(IfStmt),
 }
 
 impl Stmt {
@@ -37,10 +39,39 @@ impl Stmt {
     pub fn new_block(stmts: Vec<Stmt>) -> Self {
         Self::Block(stmt_type::Block::new(stmts))
     }
+
+    pub fn new_if_stmt(condition: Expr, then_branch: Stmt, else_branch: Option<Stmt>) -> Self {
+        Self::IfStmt(stmt_type::IfStmt::new(condition, then_branch, else_branch))
+    }
 }
 
 pub mod stmt_type {
     use super::*;
+
+    #[derive(Debug, Clone)]
+    pub struct IfStmt(Expr, Box<Stmt>, Option<Box<Stmt>>);
+    impl IfStmt {
+        pub fn new(condition: Expr, then_branch: Stmt, else_branch: Option<Stmt>) -> Self {
+            Self(condition, Box::new(then_branch), else_branch.map(Box::new))
+        }
+
+        pub fn condition(&self) -> &Expr {
+            &self.0
+        }
+
+        pub fn then_branch(&self) -> &Stmt {
+            &*self.1
+        }
+
+        pub fn else_branch(&self) -> Option<&Stmt> {
+            if let Some(else_branch) = &self.2 {
+                Some(&*else_branch)
+            } else {
+                None
+            }
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub struct Print(Expr);
     impl Print {

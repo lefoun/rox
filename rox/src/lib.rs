@@ -16,7 +16,7 @@ fn run(content: String, interepreter: &mut Interpreter, repl_mode: bool) -> Resu
     let tokens = scanner.scan_tokens();
     let mut parser = parser::Parser::new(tokens.into_iter(), repl_mode);
     let statements = parser.parse();
-    match interepreter.interpret_stmt(statements) {
+    match interepreter.interpret(statements) {
         Ok(()) => Ok(()),
         Err(e) => {
             eprintln!("{}: {e}", RoxError::RuntimeError);

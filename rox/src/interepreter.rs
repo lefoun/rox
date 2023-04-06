@@ -139,10 +139,11 @@ impl StmtVisitor for Interpreter {
 
     fn accept(&mut self, stmt: Stmt) -> Result<Self::Value, Self::Error> {
         match stmt {
-            Stmt::Print(s) => self.visit_print_stmt(s),
             Stmt::ExprStmt(s) => self.visit_expr_stmt(s),
+            Stmt::Print(s) => self.visit_print_stmt(s),
             Stmt::VarDecl(s) => self.visit_var_stmt(s),
             Stmt::Block(s) => self.visit_block(s),
+            Stmt::IfStmt(s) => self.visit_if_stmt(s),
         }
     }
 
@@ -182,6 +183,17 @@ impl StmtVisitor for Interpreter {
 
         self.pop_environment();
         Ok(())
+    }
+
+    fn visit_if_stmt(&mut self, stmt: stmt_type::IfStmt) -> Result<Self::Value, Self::Error> {
+        match <Self as ExprVisitor>::accept(self, stmt.condition().to_owned()) {
+            Ok(Value::Bool(val)) => match val {
+                true => self.execute(stmt.then_branch().to_owned()),
+                false => self.execute(stmt.else_branch().unwrap().to_owned()),
+            },
+            Ok(_) => Err(RuntimeError::ExpectedBooleanCondition),
+            Err(e) => Err(e),
+        }
     }
 }
 

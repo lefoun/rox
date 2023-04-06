@@ -71,8 +71,31 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             self.print_stmt()
         } else if self.next_matches(&[LeftBrace])? {
             Ok(Stmt::new_block(self.block()?))
+        } else if self.next_matches(&[If])? {
+            self.if_stmt()
         } else {
             self.statement_expr()
+        }
+    }
+
+    fn if_stmt(&mut self) -> Result<Stmt, ParseError> {
+        let expr = self.expression()?;
+        if !self.next_matches(&[LeftBrace])? {
+            return Err(ParseError::ExpectedToken {
+                token: format!("{{"),
+            });
+        }
+        let then_branch = Stmt::new_block(self.block()?);
+        if self.next_matches(&[Else])? {
+            if !self.next_matches(&[LeftBrace])? {
+                return Err(ParseError::ExpectedToken {
+                    token: format!("{{"),
+                });
+            }
+            let else_branch = Stmt::new_block(self.block()?);
+            Ok(Stmt::new_if_stmt(expr, then_branch, Some(else_branch)))
+        } else {
+            Ok(Stmt::new_if_stmt(expr, then_branch, None))
         }
     }
 
