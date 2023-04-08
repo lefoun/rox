@@ -144,6 +144,7 @@ impl StmtVisitor for Interpreter {
             Stmt::VarDecl(s) => self.visit_var_stmt(s),
             Stmt::Block(s) => self.visit_block(s),
             Stmt::IfStmt(s) => self.visit_if_stmt(s),
+            Stmt::WhileLoop(s) => self.visit_while_loop(s),
         }
     }
 
@@ -195,6 +196,17 @@ impl StmtVisitor for Interpreter {
             Err(e) => Err(e),
         }
     }
+
+    fn visit_while_loop(&mut self, stmt: stmt_type::WhileLoop) -> Result<Self::Value, Self::Error> {
+        loop {
+            let condition = <Self as ExprVisitor>::accept(self, stmt.condition().to_owned())?;
+            match condition {
+                Value::Bool(true) => self.execute(Stmt::Block(stmt.body().to_owned()))?,
+                Value::Bool(false) | Value::Null => return Ok(()),
+                _ => return Err(RuntimeError::ExpectedBooleanCondition),
+            }
+        }
+    }
 }
 
 impl ExprVisitor for Interpreter {
@@ -230,6 +242,49 @@ impl ExprVisitor for Interpreter {
     fn visit_binary(&mut self, expr: expr_type::Binary) -> Result<Self::Value, Self::Error> {
         let left = ExprVisitor::accept(self, expr.lhs().clone())?;
         let op = expr.op_ty();
+        if Self::token_type_matches(&op, &[Or]) {
+            match left {
+                Value::Bool(true) => return Ok(Value::Bool(true)),
+                Value::Null | Value::Bool(false) => {
+                    return ExprVisitor::accept(self, expr.rhs().clone())
+                }
+                _ => {
+                    return Err(InvalidOperand {
+                        operand: left.to_string(),
+                        expr_type: expr.operator_lexem().to_owned(),
+                        msg: format!(""),
+                    })
+                }
+            }
+        }
+        if Self::token_type_matches(&op, &[And]) {
+            match left {
+                Value::Bool(true) => {
+                    let right = ExprVisitor::accept(self, expr.rhs().clone())?;
+                    match right {
+                        Value::Bool(true) => return Ok(Value::Bool(true)),
+                        Value::Bool(false) | Value::Null => return Ok(Value::Bool(false)),
+                        _ => {
+                            return Err(InvalidOperand {
+                                operand: right.to_string(),
+                                expr_type: expr.operator_lexem().to_owned(),
+                                msg: format!(""),
+                            })
+                        }
+                    }
+                }
+                Value::Null | Value::Bool(false) => {
+                    return ExprVisitor::accept(self, expr.rhs().clone())
+                }
+                _ => {
+                    return Err(InvalidOperand {
+                        operand: left.to_string(),
+                        expr_type: expr.operator_lexem().to_owned(),
+                        msg: format!(""),
+                    })
+                }
+            }
+        }
         let right = ExprVisitor::accept(self, expr.rhs().clone())?;
 
         if !Self::token_type_matches(
@@ -259,6 +314,7 @@ impl ExprVisitor for Interpreter {
                     return Err(InvalidOperand {
                         operand: other.to_string(),
                         expr_type: expr.operator_lexem().to_owned(),
+                        msg: format!(""),
                     })
                 }
             },
@@ -269,14 +325,22 @@ impl ExprVisitor for Interpreter {
                         Self::eq_order_op(lhs, rhs, &op)
                     }
                     _ => {
-                        return Err(UnsupportedBinaryOperator {
-                            op: expr.operator_lexem().to_owned(),
+                        return Err(InvalidOperands {
+                            expr_type: format!("Binary expression {}", expr.operator_lexeme()),
+                            rhs,
+                            lhs,
+                            msg: format!(
+                                "Cannot perform operation {} on strings",
+                                expr.operator_lexem()
+                            ),
                         })
                     }
                 },
                 _ => {
-                    return Err(UnsupportedBinaryOperator {
-                        op: expr.operator_lexem().to_owned(),
+                    return Err(InvalidOperand {
+                        expr_type: expr.operator_lexem().to_owned(),
+                        operand: lhs,
+                        msg: format!("Invalid types for {} expression", expr.operator_lexem()),
                     })
                 }
             },
@@ -302,6 +366,7 @@ impl ExprVisitor for Interpreter {
                         lhs: lhs.to_string(),
                         rhs: other.to_string(),
                         expr_type: expr.operator_lexem().to_owned(),
+                        msg: format!(""),
                     })
                 }
             },
@@ -313,6 +378,7 @@ impl ExprVisitor for Interpreter {
                         lhs: Value::Null.to_string(),
                         rhs: other.to_string(),
                         expr_type: expr.operator_lexem().to_owned(),
+                        msg: format!(""),
                     })
                 }
             },
@@ -320,6 +386,7 @@ impl ExprVisitor for Interpreter {
                 return Err(InvalidOperand {
                     operand: other.to_string(),
                     expr_type: expr.operator_lexem().to_owned(),
+                    msg: format!(""),
                 })
             }
         })
@@ -339,6 +406,7 @@ impl ExprVisitor for Interpreter {
                     return Err(InvalidOperand {
                         operand: other.to_string(),
                         expr_type: expr.operator_lexem().to_owned(),
+                        msg: format!(""),
                     })
                 }
             },
@@ -348,6 +416,7 @@ impl ExprVisitor for Interpreter {
                     return Err(InvalidOperand {
                         operand: other.to_string(),
                         expr_type: expr.operator_lexem().to_owned(),
+                        msg: format!(""),
                     })
                 }
             },

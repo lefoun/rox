@@ -15,3 +15,23 @@ print a + b * a - b / 2;
 
 print "This is outer scope a";
 print a;
+
+let x = 3;
+
+if x == 3 {
+    print "x is equal to three";
+    print "I'm going to change it";
+    print "after this scope ends";
+    let x = 1;
+} else {
+    print "x is not equal to three";
+}
+
+print "x is equal to ";
+print x;
+
+x = 2;
+
+if x == 2 {
+    print "x is equal to two";
+} 

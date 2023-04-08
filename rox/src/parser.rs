@@ -4,7 +4,7 @@ use crate::scanner::{
     Token,
     TokenType::{self, *},
 };
-use crate::stmts::Stmt;
+use crate::stmts::{stmt_type, Stmt};
 use std::iter::Peekable;
 
 pub struct Parser<T: Iterator<Item = Token>> {
@@ -73,9 +73,23 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             Ok(Stmt::new_block(self.block()?))
         } else if self.next_matches(&[If])? {
             self.if_stmt()
+        } else if self.next_matches(&[While])? {
+            self.while_loop_stmt()
         } else {
             self.statement_expr()
         }
+    }
+
+    fn while_loop_stmt(&mut self) -> Result<Stmt, ParseError> {
+        let condition = self.expression()?;
+        let body = if self.next_matches(&[LeftBrace])? {
+            stmt_type::Block::new(self.block()?)
+        } else {
+            return Err(ParseError::ExpectedToken {
+                token: format!("{{"),
+            });
+        };
+        Ok(Stmt::new_while_loop(condition, body))
     }
 
     fn if_stmt(&mut self) -> Result<Stmt, ParseError> {
@@ -140,7 +154,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
     }
 
     fn assignment(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.equality()?;
+        let expr = self.logical_or()?;
         if self.next_matches(&[Equal])? {
             let value = self.assignment()?;
             let var = match &expr {
@@ -156,6 +170,25 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         Ok(expr)
     }
 
+    fn logical_or(&mut self) -> Result<Expr, ParseError> {
+        let left = self.logical_and()?;
+        if let Some(operator) = self.tokens.next_if(|token| Self::matches(token, &[Or])) {
+            let right = self.logical_and()?;
+            Ok(Expr::new_binary(left, operator, right))
+        } else {
+            Ok(left)
+        }
+    }
+
+    fn logical_and(&mut self) -> Result<Expr, ParseError> {
+        let left = self.equality()?;
+        if let Some(operator) = self.tokens.next_if(|token| Self::matches(token, &[And])) {
+            let right = self.equality()?;
+            Ok(Expr::new_binary(left, operator, right))
+        } else {
+            Ok(left)
+        }
+    }
     fn equality(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.comparison()?;
         while let Some(operator) = self

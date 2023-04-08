@@ -12,6 +12,7 @@ pub trait StmtVisitor {
     fn visit_var_stmt(&mut self, stmt: stmt_type::VarDecl) -> Result<Self::Value, Self::Error>;
     fn visit_block(&mut self, stmt: stmt_type::Block) -> Result<Self::Value, Self::Error>;
     fn visit_if_stmt(&mut self, stmt: stmt_type::IfStmt) -> Result<Self::Value, Self::Error>;
+    fn visit_while_loop(&mut self, stmt: stmt_type::WhileLoop) -> Result<Self::Value, Self::Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -21,6 +22,7 @@ pub enum Stmt {
     VarDecl(VarDecl),
     Block(Block),
     IfStmt(IfStmt),
+    WhileLoop(WhileLoop),
 }
 
 impl Stmt {
@@ -42,6 +44,10 @@ impl Stmt {
 
     pub fn new_if_stmt(condition: Expr, then_branch: Stmt, else_branch: Option<Stmt>) -> Self {
         Self::IfStmt(stmt_type::IfStmt::new(condition, then_branch, else_branch))
+    }
+
+    pub fn new_while_loop(condition: Expr, body: stmt_type::Block) -> Self {
+        Self::WhileLoop(stmt_type::WhileLoop::new(condition, body))
     }
 }
 
@@ -69,6 +75,22 @@ pub mod stmt_type {
             } else {
                 None
             }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct WhileLoop(Expr, Box<stmt_type::Block>);
+    impl WhileLoop {
+        pub fn new(condition: Expr, body: stmt_type::Block) -> Self {
+            Self(condition, Box::new(body))
+        }
+
+        pub fn condition(&self) -> &Expr {
+            &self.0
+        }
+
+        pub fn body(&self) -> &stmt_type::Block {
+            &*self.1
         }
     }
 

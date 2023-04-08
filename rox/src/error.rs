@@ -33,18 +33,22 @@ pub enum ParseError {
 
     #[error("Parse error {msg}")]
     BadOperand { msg: String },
+
+    #[error("Parse error: Expected expression")]
+    ExpectedExpression
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeError {
-    #[error("Inavlid Operand {operand} for {expr_type} expression")]
-    InvalidOperand { operand: String, expr_type: String },
+    #[error("Inavlid Operand {operand} for {expr_type} expression, {msg}")]
+    InvalidOperand { operand: String, expr_type: String, msg: String },
 
-    #[error("Inavlid Operands lhs: {lhs} rhs: {rhs} for {expr_type} expression")]
+    #[error("Inavlid Operands '{lhs}' and '{rhs}' for {expr_type} expression. {msg}")]
     InvalidOperands {
         lhs: String,
         rhs: String,
         expr_type: String,
+        msg: String,
     },
 
     #[error("Invalid expression: Expected literal got {token}")]
