@@ -55,6 +55,22 @@ pub mod stmt_type {
     use super::*;
 
     #[derive(Debug, Clone)]
+    pub struct WhileLoop(Expr, stmt_type::Block);
+    impl WhileLoop {
+        pub fn new(condition: Expr, body: stmt_type::Block) -> Self {
+            Self(condition, body)
+        }
+
+        pub fn condition(&self) -> &Expr {
+            &self.0
+        }
+
+        pub fn body(&self) -> &stmt_type::Block {
+            &self.1
+        }
+    }
+
+    #[derive(Debug, Clone)]
     pub struct IfStmt(Expr, Box<Stmt>, Option<Box<Stmt>>);
     impl IfStmt {
         pub fn new(condition: Expr, then_branch: Stmt, else_branch: Option<Stmt>) -> Self {
@@ -75,22 +91,6 @@ pub mod stmt_type {
             } else {
                 None
             }
-        }
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct WhileLoop(Expr, Box<stmt_type::Block>);
-    impl WhileLoop {
-        pub fn new(condition: Expr, body: stmt_type::Block) -> Self {
-            Self(condition, Box::new(body))
-        }
-
-        pub fn condition(&self) -> &Expr {
-            &self.0
-        }
-
-        pub fn body(&self) -> &stmt_type::Block {
-            &*self.1
         }
     }
 

@@ -75,6 +75,8 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             self.if_stmt()
         } else if self.next_matches(&[While])? {
             self.while_loop_stmt()
+        } else if self.next_matches(&[For])? {
+            self.for_loop_stmt()
         } else {
             self.statement_expr()
         }
@@ -90,6 +92,34 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             });
         };
         Ok(Stmt::new_while_loop(condition, body))
+    }
+
+    fn for_loop_stmt(&mut self) -> Result<Stmt, ParseError> {
+        /*
+         * this functions desugares a for loop into a block
+         * which contains an optional variable declaration, a while loop, and
+         * an optional expression (usually an incrementer)
+         * the loop looks like this: for (var i = 0; i < 10; i++) {}
+         */
+        let mut block = Vec::new();
+        self.next_matches_or_error(LeftParen, "(")?;
+        if self.next_matches(&[Var])? {
+            let initializer = self.var_declaration()?;
+            block.push(initializer);
+        }
+        let condition = self.expression()?;
+        let mut end_of_iteration_expr = None;
+        self.next_matches_or_error(SemiColon, ";")?;
+        if !self.next_matches(&[RightParen])? {
+            end_of_iteration_expr = Some(Stmt::new_expr_stmt(self.expression()?));
+        }
+        self.next_matches_or_error(RightParen, ")")?;
+        self.next_matches_or_error(LeftBrace, "{")?;
+        let mut body = self.block()?;
+        end_of_iteration_expr.map(|expr| body.push(expr));
+        let loop_stmt = Stmt::new_while_loop(condition, stmt_type::Block::new(body));
+        block.push(loop_stmt);
+        Ok(Stmt::new_block(block))
     }
 
     fn if_stmt(&mut self) -> Result<Stmt, ParseError> {
@@ -290,6 +320,21 @@ impl<T: Iterator<Item = Token>> Parser<T> {
             Ok(true)
         } else {
             Ok(false)
+        }
+    }
+
+    fn next_matches_or_error(&mut self, ty: TokenType, lexem: &str) -> Result<(), ParseError> {
+        let token = self.tokens.peek();
+        if token.is_none() {
+            return Err(ParseError::UnexpectedEOF);
+        }
+        if ty == token.unwrap().token_type() {
+            self.tokens.next();
+            Ok(())
+        } else {
+            Err(ParseError::ExpectedToken {
+                token: lexem.to_string(),
+            })
         }
     }
 
