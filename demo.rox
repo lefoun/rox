@@ -35,3 +35,16 @@ x = 2;
 if x == 2 {
     print "x is equal to two";
 } 
+
+fn say_hi() {
+    print "Hi!";
+}
+
+fn count(n) {
+    for (let i = 0; i < n; i = i + 1) {
+        print i;
+    }
+}
+
+say_hi();
+count(40);

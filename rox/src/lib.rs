@@ -1,20 +1,19 @@
-mod environment;
 mod error;
-mod exprs;
-mod interepreter;
+mod interpreter;
 mod parser;
 mod scanner;
-mod stmts;
 
 use error::RoxError;
-use interepreter::Interpreter;
+use interpreter::interpreter::Interpreter;
+use scanner::scanner::Scanner;
+use parser::parser::Parser;
 use std::fs;
 use std::io::{self, BufRead, Write};
 
 fn run(content: String, interepreter: &mut Interpreter, repl_mode: bool) -> Result<(), RoxError> {
-    let mut scanner = scanner::Scanner::new(content);
+    let mut scanner = Scanner::new(content);
     let tokens = scanner.scan_tokens();
-    let mut parser = parser::Parser::new(tokens.into_iter(), repl_mode);
+    let mut parser = Parser::new(tokens.into_iter(), repl_mode);
     let statements = parser.parse();
     match interepreter.interpret(statements) {
         Ok(()) => Ok(()),

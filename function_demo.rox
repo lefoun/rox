@@ -1,0 +1,77 @@
+fn putnbr(n) {
+    if n <= 9 {
+        print n;
+    } else {
+        putnbr(n / 10);
+        putnbr(n % 10);
+    }
+}
+
+putnbr(12345);
+
+fn sayHi(first, middle, last) {
+    print "Hi, " + first + " " + middle + " " + last + "!";
+}
+  
+sayHi("Dear", "Attentive", "Reader");
+
+fn print_time() {
+    print clock();
+}
+
+print_time();
+
+fn truth(arg) {
+    if arg {
+        return "True";
+    } else {
+        return "False";
+    }
+}
+
+print truth(true);
+print truth(false);
+
+fn fibo(n) {
+    if n <= 1 {
+        return n;
+    } else {
+        return fibo(n - 2) + fibo(n - 1);
+    }
+}
+
+print fibo(10);
+
+fn call_func(f) {
+    f();
+}
+
+fn say_hi() {
+    print "Hi!";
+}
+
+call_func(print_time);
+call_func(say_hi);
+
+fn call_inner_fun() {
+    fn inner_fun() {
+        print "Inner fun!";
+    }
+    print "Outer fun about to call inner fun!";
+    inner_fun();
+}
+
+call_inner_fun();
+
+fn make_counter() {
+    let i = 0;
+    fn count() {
+        i = i + 1;
+        return i;
+    }
+    return count;
+}
+
+let counter = make_counter();
+print counter();
+print counter();

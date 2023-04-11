@@ -21,7 +21,7 @@ impl Scanner {
             ("class", Class),
             ("else", Else),
             ("false", False),
-            ("fun", Fun),
+            ("fn", Fn),
             ("for", For),
             ("if", If),
             ("null", Null),
@@ -70,6 +70,7 @@ impl Scanner {
             '+' => self.add_token(Plus, c),
             '*' => self.add_token(Star, c),
             '-' => self.add_token(Minus, c),
+            '%' => self.add_token(Percent, c),
             ',' => self.add_token(Comma, c),
             '.' => self.add_token(Dot, c),
             ';' => self.add_token(SemiColon, c),
@@ -121,14 +122,14 @@ impl Scanner {
         }
     }
 
-    fn add_token(&mut self, tkn_type: TokenType, lexem: char) {
+    fn add_token(&mut self, tkn_type: TokenType, lexeme: char) {
         self.tokens
-            .push(Token::new(tkn_type, self.line, lexem.to_string()));
+            .push(Token::new(tkn_type, self.line, lexeme.to_string()));
     }
 
-    fn add_long_token(&mut self, tkn_type: TokenType, lexem: &str) {
+    fn add_long_token(&mut self, tkn_type: TokenType, lexeme: &str) {
         self.tokens
-            .push(Token::new(tkn_type, self.line, lexem.to_string()));
+            .push(Token::new(tkn_type, self.line, lexeme.to_string()));
     }
 
     fn add_literal_token(&mut self, chr: char, source: &mut Peekable<CharIndices>) {
@@ -161,9 +162,9 @@ impl Scanner {
         match num.parse::<f64>() {
             Ok(number) => {
                 self.current += num.len();
-                let lexem = self.source.as_str()[self.start..self.current].to_owned();
+                let lexeme = self.source.as_str()[self.start..self.current].to_owned();
                 self.tokens
-                    .push(Token::new(TokenType::Number(number), self.line, lexem));
+                    .push(Token::new(TokenType::Number(number), self.line, lexeme));
             }
             Err(_) => self.error(chr),
         };
@@ -212,6 +213,7 @@ pub enum TokenType {
     LeftParen,
     Less,
     Minus,
+    Percent,
     Plus,
     RightBrace,
     RightBracket,
@@ -237,7 +239,7 @@ pub enum TokenType {
     Else,
     False,
     For,
-    Fun,
+    Fn,
     If,
     Null,
     Or,
@@ -253,24 +255,24 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     token_type: TokenType,
     line: usize,
-    lexem: String,
+    lexeme: String,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, line: usize, lexem: String) -> Self {
+    pub fn new(token_type: TokenType, line: usize, lexeme: String) -> Self {
         Self {
             token_type,
             line,
-            lexem,
+            lexeme,
         }
     }
 
-    pub fn lexem(&self) -> &str {
-        self.lexem.as_str()
+    pub fn lexeme(&self) -> &str {
+        self.lexeme.as_str()
     }
 
     pub fn token_type(&self) -> TokenType {
@@ -284,7 +286,7 @@ impl Token {
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.lexem())
+        write!(f, "{}", self.lexeme())
     }
 }
 

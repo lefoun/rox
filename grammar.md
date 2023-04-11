@@ -1,13 +1,17 @@
 # Production rules
 program         -> declaration* EOF ;
-declaration     -> varDecl | statement ;
+declaration     -> varDecl | funDecl | statement ;
+funDecl         -> "fun" function ;
+function        -> IDENTIFIER "(" params? ")" block ;
+params          ->  IDENTIFIER ( "," IDENTIFIER )*
 varDecl         -> "let" IDENTIFIER ( "=" expression )? ";" ;
-statement       -> printStmt | exprStmt | block | ifStmt | WhileLoop ;
+statement       -> printStmt | exprStmt | returnStmt| block | ifStmt | WhileLoop ;
 whileLoop       -> "while" "expression" block ;
 forLoop         -> "for" "(" ( varDecl )? ";" expression ";" ( statement )? ")" block ;
 ifStmt          -> "if" expression block ( "else" block )? ;
 block           -> "{" declaration * "}" ;
 exprStmt        -> expression ";" ;
+returnStmt      -> "return" expression? ";" ;
 printStmt       -> "print" expression ";" ;
 expression      -> assignment ;
 assignment      -> IDENTIFIER "=" assignment | logical_or ;
@@ -17,7 +21,9 @@ equality        -> comparison (( "==" | "!=" ) comparison )* ;
 comparison      -> term (( ">" | "<" | ">=" | "<=" ) term )* ;
 term            -> factor (( "+" | "-" ) factor )* ;
 factor          -> unary (( "*" | "/" ) unary )* ;
-unary           -> ( "-" | "!" ) unary | primary ;
+unary           -> ( "-" | "!" ) unary | call ;
+call            -> primary ( "(" argument* ")" )?
+argument        -> expression ( "," argument )*
 primary         -> NUMBER | STRING | "true" | "false" | "null" | "(" expression ")" | IDENTIFIER ;
 NUMBER          -> [0-9]+ ;
 STRING          -> [a-z_]+ ;

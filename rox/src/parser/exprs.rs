@@ -1,4 +1,4 @@
-use crate::scanner::{Token, TokenType};
+use crate::scanner::scanner::{Token, TokenType};
 use expr_type::*;
 
 pub trait ExprVisitor {
@@ -13,9 +13,10 @@ pub trait ExprVisitor {
     fn visit_variable(&mut self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error>;
     fn visit_assignment(&mut self, expr: expr_type::Assignment)
         -> Result<Self::Value, Self::Error>;
+    fn visit_call(&mut self, expr: expr_type::Call) -> Result<Self::Value, Self::Error>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),
@@ -23,6 +24,7 @@ pub enum Expr {
     Unary(Unary),
     Variable(Variable),
     Assignment(Assignment),
+    Call(Call),
 }
 
 impl Expr {
@@ -49,11 +51,15 @@ impl Expr {
     pub fn new_assignment(name: &str, expr: Expr) -> Self {
         Self::Assignment(expr_type::Assignment::new(name, expr))
     }
+
+    pub fn new_call(callee: Expr, left_paren: Token, args: Vec<Expr>) -> Self {
+        Self::Call(expr_type::Call::new(callee, left_paren, args))
+    }
 }
 
 pub mod expr_type {
     use super::*;
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Binary(Box<Expr>, Token, Box<Expr>);
     impl Binary {
         pub fn new(lhs: Expr, op: Token, rhs: Expr) -> Self {
@@ -72,12 +78,12 @@ pub mod expr_type {
             self.1.token_type()
         }
 
-        pub fn operator_lexem(&self) -> &str {
-            self.1.lexem()
+        pub fn operator_lexeme(&self) -> &str {
+            self.1.lexeme()
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Grouping(Box<Expr>);
     impl Grouping {
         pub fn new(expr: Expr) -> Self {
@@ -89,7 +95,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Clone, Debug)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Literal(Token);
     impl Literal {
         pub fn new(token: Token) -> Self {
@@ -100,12 +106,12 @@ pub mod expr_type {
             self.0.token_type()
         }
 
-        pub fn lexem(&self) -> &str {
-            self.0.lexem()
+        pub fn lexeme(&self) -> &str {
+            self.0.lexeme()
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Unary(Token, Box<Expr>);
     impl Unary {
         pub fn new(op: Token, rhs: Expr) -> Self {
@@ -120,12 +126,12 @@ pub mod expr_type {
             &self.1
         }
 
-        pub fn operator_lexem(&self) -> &str {
-            self.0.lexem()
+        pub fn operator_lexeme(&self) -> &str {
+            self.0.lexeme()
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Variable(String);
     impl Variable {
         pub fn new(name: &str) -> Self {
@@ -137,7 +143,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Assignment(String, Box<Expr>);
     impl Assignment {
         pub fn new(name: &str, expr: Expr) -> Self {
@@ -150,6 +156,26 @@ pub mod expr_type {
 
         pub fn name(&self) -> &str {
             &self.0
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Call(Box<Expr>, Token, Vec<Expr>);
+    impl Call {
+        pub fn new(callee: Expr, left_paren: Token, args: Vec<Expr>) -> Self {
+            Self(Box::new(callee), left_paren, args)
+        }
+
+        pub fn callee(&self) -> &Expr {
+            &self.0
+        }
+
+        pub fn paren(&self) -> &Token {
+            &self.1
+        }
+
+        pub fn args(&self) -> &Vec<Expr> {
+            &self.2
         }
     }
 }
