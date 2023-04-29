@@ -3,9 +3,10 @@ use super::error::RuntimeError::{self, *};
 use crate::parser::exprs::{expr_type, Expr, ExprVisitor};
 use crate::parser::stmts::{stmt_type, Stmt, StmtVisitor};
 use crate::scanner::scanner::TokenType::{self, *};
-use std::collections::VecDeque;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Bool(bool),
     Null,
@@ -20,11 +21,19 @@ impl Clone for RoxCallable {
         Self(self.0.clone_box())
     }
 }
-struct RoxCallable(Box<dyn Callable>);
+pub struct RoxCallable(Box<dyn Callable>);
 // hack to make RoxCallable comparable
 impl PartialEq for RoxCallable {
     fn eq(&self, other: &Self) -> bool {
         self.0.to_string() == other.0.to_string()
+    }
+}
+
+impl std::fmt::Debug for RoxCallable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RoxCallable")
+            .field("inner", &"Box<dyn Callable>")
+            .finish()
     }
 }
 
@@ -59,20 +68,20 @@ impl Callee {
 }
 
 pub struct Interpreter {
-    env: VecDeque<Environment>,
+    env: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        let mut env = VecDeque::new();
-        let mut global_env = Environment::new();
+        let mut env = Environment::new(None);
         let time_function = super::native_functions::Clock;
-        global_env.define(
+        env.define(
             String::from("clock"),
             Value::Callable(RoxCallable::new(Box::new(time_function))),
         );
-        env.push_front(global_env);
-        Self { env }
+        Self {
+            env: Rc::new(RefCell::new(env)),
+        }
     }
 
     pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
@@ -87,36 +96,24 @@ impl Interpreter {
     }
 
     fn assign_var(&mut self, name: String, value: Value) -> Result<(), RuntimeError> {
-        for env in &mut self.env {
-            if env.get(&name).is_some() {
-                env.define(name, value);
-                return Ok(());
-            }
+        if self.get_var(&name).is_ok() {
+            self.env.borrow_mut().assign(name, value);
+            return Ok(());
         }
         Err(RuntimeError::UndefinedVariable { ident: name })
     }
 
     fn define_var(&mut self, name: String, value: Value) {
-        self.env.front_mut().unwrap().define(name, value);
+        self.env.borrow_mut().define(name, value);
     }
 
     fn get_var(&mut self, name: &str) -> Result<Value, RuntimeError> {
-        for env in &self.env {
-            if env.get(name).is_some() {
-                return Ok(env.get(name).unwrap());
-            }
+        if let Some(var) = self.env.borrow().get(&name) {
+            return Ok(var);
         }
         Err(RuntimeError::UndefinedVariable {
             ident: name.to_owned(),
         })
-    }
-
-    fn add_new_environment(&mut self) {
-        self.env.push_front(Environment::new());
-    }
-
-    fn pop_environment(&mut self) {
-        self.env.pop_front();
     }
 
     fn token_type_matches(ty: &TokenType, typs: &[TokenType]) -> bool {
@@ -214,7 +211,9 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_block(&mut self, stmt: stmt_type::Block) -> Result<Self::Value, Self::Error> {
-        self.add_new_environment();
+        let old_env = Rc::clone(&self.env);
+        let new_env = Rc::new(RefCell::new(Environment::new(Some(Rc::clone(&self.env)))));
+        self.env = new_env;
         let mut ret_value = None;
 
         for stmt in stmt.stmts() {
@@ -223,8 +222,7 @@ impl StmtVisitor for Interpreter {
                 break;
             }
         }
-
-        self.pop_environment();
+        self.env = old_env;
         Ok(ret_value)
     }
 
@@ -258,7 +256,11 @@ impl StmtVisitor for Interpreter {
         stmt: stmt_type::FunctionDecl,
     ) -> Result<Self::Value, Self::Error> {
         let name = stmt.name().to_string();
-        let function = LoxFunction::new(stmt);
+        let env_clone = Rc::clone(&self.env);
+        let function = LoxFunction::new(
+            stmt,
+            Rc::new(RefCell::new(Environment::new(Some(env_clone)))),
+        );
         self.define_var(name, Value::Callable(RoxCallable::new(Box::new(function))));
         Ok(None)
     }
@@ -518,7 +520,7 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_call(&mut self, expr: expr_type::Call) -> Result<Self::Value, Self::Error> {
-        let callee = match <Self as ExprVisitor>::accept(self, expr.callee().to_owned())? {
+        let mut callee = match <Self as ExprVisitor>::accept(self, expr.callee().to_owned())? {
             Value::Callable(callable) => callable.0,
             other => {
                 return Err(InvalidOperand {
@@ -535,8 +537,8 @@ impl ExprVisitor for Interpreter {
             .map(|arg| ExprVisitor::accept(self, arg))
             .collect::<Result<Vec<Self::Value>, Self::Error>>()?;
 
-        let function = callee.call(self, args)?;
-        Ok(function)
+        let ret_value = callee.call(self, args)?;
+        Ok(ret_value)
     }
 }
 
@@ -555,24 +557,36 @@ where
 }
 
 pub trait Callable: ClonableCallable {
-    fn call(&self, interpreter: &mut Interpreter, args: Vec<Value>) -> Result<Value, RuntimeError>;
+    fn call(
+        &mut self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> Result<Value, RuntimeError>;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct LoxFunction {
     declaration: stmt_type::FunctionDecl,
+    closure: Rc<RefCell<Environment>>,
 }
 
 impl LoxFunction {
-    pub fn new(declaration: stmt_type::FunctionDecl) -> Self {
-        Self { declaration }
+    pub fn new(declaration: stmt_type::FunctionDecl, closure: Rc<RefCell<Environment>>) -> Self {
+        Self {
+            declaration,
+            closure,
+        }
     }
 }
 
 impl Callable for LoxFunction {
-    fn call(&self, interpreter: &mut Interpreter, args: Vec<Value>) -> Result<Value, RuntimeError> {
+    fn call(
+        &mut self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
         let mut ret_val = Value::Null;
         if args.len() != self.arity() {
             return Err(MissingPositionalArguments {
@@ -585,25 +599,24 @@ impl Callable for LoxFunction {
                     .collect(),
             });
         }
-        let mut local_env = Environment::new();
+        let prev_env = Rc::clone(&interpreter.env);
+        interpreter.env = Rc::new(RefCell::new(Environment::new(Some(Rc::clone(
+            &self.closure,
+        )))));
         self.declaration
             .params()
             .iter()
             .zip(args.iter())
             .for_each(|(param, arg)| {
-                local_env.define(param.lexeme().to_owned(), arg.clone());
+                interpreter.define_var(param.lexeme().to_owned(), arg.clone());
             });
-        interpreter.env.push_front(local_env);
         for stmt in self.declaration.body().iter() {
-            match interpreter.execute(stmt.to_owned())? {
-                None => (),
-                Some(v) => {
-                    ret_val = v;
-                    break;
-                }
-            };
+            if let Some(v) = interpreter.execute(stmt.to_owned())? {
+                ret_val = v;
+                break;
+            }
         }
-        interpreter.env.pop_front();
+        interpreter.env = prev_env;
         Ok(ret_val)
     }
 

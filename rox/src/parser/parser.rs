@@ -119,8 +119,13 @@ impl<T: Iterator<Item = Token>> Parser<T> {
                 }
             }
         }
+        let mut body = Vec::new();
         self.next_matches_or_error(LeftBrace, "{")?;
-        Ok(Stmt::new_function_decl(name, params, self.block()?))
+        while !self.next_matches(&[RightBrace])? {
+            body.push(self.declaration()?);
+        }
+
+        Ok(Stmt::new_function_decl(name, params, body))
     }
 
     fn while_loop_stmt(&mut self) -> Result<Stmt, ParseError> {

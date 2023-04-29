@@ -5,7 +5,7 @@ use super::interpreter::{Callable, Value};
 pub struct Clock;
 
 impl Callable for Clock {
-    fn call(&self, _: &mut crate::Interpreter, _: Vec<Value>) -> Result<Value, RuntimeError> {
+    fn call(&mut self, _: &mut crate::Interpreter, _: Vec<Value>) -> Result<Value, RuntimeError> {
         Ok(Value::Number(
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

@@ -2,7 +2,7 @@
 program         -> declaration* EOF ;
 declaration     -> varDecl | funDecl | statement ;
 funDecl         -> "fun" function ;
-function        -> IDENTIFIER "(" params? ")" block ;
+function        -> IDENTIFIER "(" params? ")" "{" declaration* "}" ;
 params          ->  IDENTIFIER ( "," IDENTIFIER )*
 varDecl         -> "let" IDENTIFIER ( "=" expression )? ";" ;
 statement       -> printStmt | exprStmt | returnStmt| block | ifStmt | WhileLoop ;

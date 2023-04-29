@@ -63,15 +63,18 @@ fn call_inner_fun() {
 
 call_inner_fun();
 
+// the env of count() should point to its parent make_counter()
+// that's how it can find 
 fn make_counter() {
     let i = 0;
     fn count() {
         i = i + 1;
-        return i;
+        print i;
     }
     return count;
 }
 
 let counter = make_counter();
-print counter();
-print counter();
+counter();
+counter();
+counter();
