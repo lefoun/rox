@@ -628,3 +628,112 @@ impl Callable for LoxFunction {
         format!("<function {}>", self.declaration.name())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_interpreter_define_var() {
+        let mut interpreter = Interpreter::new();
+        interpreter.define_var("foo".to_string(), Value::Number(42.0));
+
+        let value = interpreter.get_var("foo").unwrap();
+        assert_eq!(value, Value::Number(42.0));
+    }
+
+    #[test]
+    fn test_interpreter_assign_var() {
+        let mut interpreter = Interpreter::new();
+        interpreter.define_var("bar".to_string(), Value::Bool(true));
+
+        let value = interpreter.get_var("bar").unwrap();
+        assert_eq!(value, Value::Bool(true));
+
+        let assign_result = interpreter.assign_var("bar".to_string(), Value::Bool(false));
+        assert!(assign_result.is_ok());
+
+        let value = interpreter.get_var("bar").unwrap();
+        assert_eq!(value, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_interpreter_assign_var_error() {
+        let mut interpreter = Interpreter::new();
+        let assign_result =
+            interpreter.assign_var("non_existent_var".to_string(), Value::Number(42.0));
+        assert!(assign_result.is_err());
+    }
+
+    #[test]
+    fn test_interpreter_get_var_error() {
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.get_var("non_existent_var");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_binary_op_numbers() {
+        let lhs = 10.0;
+        let rhs = 5.0;
+
+        let result = Interpreter::binary_op_numbers(lhs, rhs, &TokenType::Minus).unwrap();
+        assert_eq!(result, Value::Number(lhs - rhs));
+
+        let result = Interpreter::binary_op_numbers(lhs, rhs, &TokenType::Star).unwrap();
+        assert_eq!(result, Value::Number(lhs * rhs));
+
+        let result = Interpreter::binary_op_numbers(lhs, rhs, &TokenType::Plus).unwrap();
+        assert_eq!(result, Value::Number(lhs + rhs));
+
+        let result = Interpreter::binary_op_numbers(lhs, rhs, &TokenType::Percent).unwrap();
+        assert_eq!(result, Value::Number(lhs % rhs));
+
+        let result = Interpreter::binary_op_numbers(lhs, rhs, &TokenType::Slash).unwrap();
+        assert_eq!(result, Value::Number(lhs / rhs));
+    }
+
+    #[test]
+    fn test_eq_order_op() {
+        let lhs = 10;
+        let rhs = 5;
+
+        let result = Interpreter::eq_order_op(lhs, rhs, &TokenType::Greater).unwrap();
+        assert_eq!(result, Value::Bool(lhs > rhs));
+
+        let result = Interpreter::eq_order_op(lhs, rhs, &TokenType::GreaterEqual).unwrap();
+        assert_eq!(result, Value::Bool(lhs >= rhs));
+
+        let result = Interpreter::eq_order_op(lhs, rhs, &TokenType::Less).unwrap();
+        assert_eq!(result, Value::Bool(lhs < rhs));
+
+        let result = Interpreter::eq_order_op(lhs, rhs, &TokenType::LessEqual).unwrap();
+        assert_eq!(result, Value::Bool(lhs <= rhs));
+    }
+
+    #[test]
+    fn test_eq_op() {
+        let lhs = "hello";
+        let rhs = "world";
+
+        let result = Interpreter::eq_op(lhs, rhs, &TokenType::DoubleEqual).unwrap();
+        assert_eq!(result, Value::Bool(lhs == rhs));
+
+        let result = Interpreter::eq_op(lhs, rhs, &TokenType::BangEqual).unwrap();
+        assert_eq!(result, Value::Bool(lhs != rhs));
+    }
+
+    #[test]
+    fn test_token_type_matches() {
+        let token_type = TokenType::Plus;
+        let token_types = [TokenType::Plus, TokenType::Minus, TokenType::Star];
+
+        let result = Interpreter::token_type_matches(&token_type, &token_types);
+        assert_eq!(result, true);
+
+        let token_type = TokenType::Slash;
+        let result = Interpreter::token_type_matches(&token_type, &token_types);
+        assert_eq!(result, false);
+    }
+
+}
