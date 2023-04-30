@@ -36,7 +36,7 @@ pub enum Stmt {
 }
 
 impl Stmt {
-    pub fn new_print(value: Expr) -> Self {
+    pub fn new_print_repl(value: Expr) -> Self {
         Self::Print(stmt_type::Print::new(value))
     }
 

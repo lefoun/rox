@@ -35,4 +35,7 @@ pub enum RuntimeError {
 
     #[error("Missing {} required positional argument{}: {}.", args.len(), if args.len() > 1 { "s" } else { "" }, args.join(", "))]
     MissingPositionalArguments { args: Vec<String> },
+
+    #[error("Too many arguments for function call {}", fun)]
+    TooManyArguments { fun: String },
 }

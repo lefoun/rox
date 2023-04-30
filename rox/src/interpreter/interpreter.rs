@@ -74,10 +74,16 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let mut env = Environment::new(None);
+        // declaring native functions
         let time_function = super::native_functions::Clock;
+        let print_function = super::native_functions::Print;
         env.define(
             String::from("clock"),
             Value::Callable(RoxCallable::new(Box::new(time_function))),
+        );
+        env.define(
+            String::from("print"),
+            Value::Callable(RoxCallable::new(Box::new(print_function))),
         );
         Self {
             env: Rc::new(RefCell::new(env)),
@@ -588,7 +594,7 @@ impl Callable for LoxFunction {
         args: Vec<Value>,
     ) -> Result<Value, RuntimeError> {
         let mut ret_val = Value::Null;
-        if args.len() != self.arity() {
+        if args.len() < self.arity() {
             return Err(MissingPositionalArguments {
                 args: self
                     .declaration
@@ -597,6 +603,10 @@ impl Callable for LoxFunction {
                     .skip(args.len())
                     .map(|p| format!("'{}'", p.lexeme()))
                     .collect(),
+            });
+        } else if args.len() > self.arity() {
+            return Err(TooManyArguments {
+                fun: self.declaration.name().to_string(),
             });
         }
         let prev_env = Rc::clone(&interpreter.env);
@@ -735,5 +745,4 @@ mod test {
         let result = Interpreter::token_type_matches(&token_type, &token_types);
         assert_eq!(result, false);
     }
-
 }

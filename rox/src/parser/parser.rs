@@ -67,9 +67,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
     }
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
-        if self.next_matches(&[Print])? {
-            self.print_stmt()
-        } else if self.next_matches(&[LeftBrace])? {
+        if self.next_matches(&[LeftBrace])? {
             Ok(Stmt::new_block(self.block()?))
         } else if self.next_matches(&[If])? {
             self.if_stmt()
@@ -200,23 +198,12 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         Ok(stmts)
     }
 
-    fn print_stmt(&mut self) -> Result<Stmt, ParseError> {
-        let expr = self.expression()?;
-        if self.next_matches(&[SemiColon])? {
-            Ok(Stmt::new_print(expr))
-        } else {
-            Err(ParseError::ExpectedToken {
-                token: ";".to_string(),
-            })
-        }
-    }
-
     fn statement_expr(&mut self) -> Result<Stmt, ParseError> {
         let expr = self.expression()?;
         match self.next_matches(&[SemiColon]) {
             Ok(true) => Ok(Stmt::new_expr_stmt(expr)),
             Ok(false) if Self::matches(self.tokens.peek().unwrap(), &[Eof]) && self.repl_mode => {
-                Ok(Stmt::new_print(expr))
+                Ok(Stmt::new_print_repl(expr))
             }
             Ok(false) => Err(ParseError::ExpectedToken {
                 token: ";".to_string(),
@@ -451,7 +438,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
     fn synchronisze(&mut self) {
         while let Some(token) = self.tokens.next() {
             match token.token_type() {
-                Class | Fn | Let | While | If | Print | Return => (),
+                Class | Fn | Let | While | If | Return => (),
                 _ => self.synchronisze(),
             }
         }

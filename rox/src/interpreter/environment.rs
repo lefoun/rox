@@ -17,12 +17,6 @@ impl Environment {
         }
     }
 
-    pub fn debug(&self) {
-        for (key, value) in self.env.borrow().iter() {
-            dbg!(key, value.to_string());
-        }
-    }
-
     pub fn define(&mut self, name: String, value: Value) {
         self.env.borrow_mut().insert(name, value);
     }

@@ -5,14 +5,13 @@ funDecl         -> "fun" function ;
 function        -> IDENTIFIER "(" params? ")" "{" declaration* "}" ;
 params          ->  IDENTIFIER ( "," IDENTIFIER )*
 varDecl         -> "let" IDENTIFIER ( "=" expression )? ";" ;
-statement       -> printStmt | exprStmt | returnStmt| block | ifStmt | WhileLoop ;
+statement       -> exprStmt | returnStmt| block | ifStmt | WhileLoop ;
 whileLoop       -> "while" "expression" block ;
 forLoop         -> "for" "(" ( varDecl )? ";" expression ";" ( statement )? ")" block ;
 ifStmt          -> "if" expression block ( "else" block )? ;
 block           -> "{" declaration * "}" ;
 exprStmt        -> expression ";" ;
 returnStmt      -> "return" expression? ";" ;
-printStmt       -> "print" expression ";" ;
 expression      -> assignment ;
 assignment      -> IDENTIFIER "=" assignment | logical_or ;
 logical_or      -> logical_and ( "or" logical_and )* ;
