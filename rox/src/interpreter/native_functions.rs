@@ -1,5 +1,3 @@
-use crate::parser::exprs::{Expr, ExprVisitor};
-
 use super::error::RuntimeError;
 use super::interpreter::{Callable, Value};
 
@@ -21,7 +19,7 @@ impl Callable for Clock {
     }
 
     fn to_string(&self) -> String {
-        format!("<function {}>", "clock")
+        format!("<builtin function {}>", "clock")
     }
 }
 
@@ -39,18 +37,42 @@ impl Callable for Print {
                 fun: "Print".to_string(),
             });
         }
-        for val in args.iter() {
+        for val in args.into_iter() {
             print!("{val}");
         }
-        println!("");
         Ok(Value::Null)
     }
 
     fn to_string(&self) -> String {
-        format!("<function {}>", "print")
+        format!("<builtin function {}>", "print")
     }
 
     fn arity(&self) -> usize {
         128
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PrintLn;
+
+impl Callable for PrintLn {
+    fn call(
+        &mut self,
+        interpreter: &mut super::interpreter::Interpreter,
+        args: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        let mut args = args;
+        let mut print = Print;
+
+        args.push(Value::Str("\n".to_string()));
+        print.call(interpreter, args)
+    }
+
+    fn arity(&self) -> usize {
+        127
+    }
+
+    fn to_string(&self) -> String {
+        format!("<builtin function {}>", "println")
     }
 }

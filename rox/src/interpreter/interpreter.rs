@@ -56,17 +56,6 @@ impl std::fmt::Display for Value {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Callee {
-    identifier: String,
-}
-
-impl Callee {
-    pub fn new(identifier: String) -> Self {
-        Self { identifier }
-    }
-}
-
 pub struct Interpreter {
     env: Rc<RefCell<Environment>>,
 }
@@ -77,6 +66,7 @@ impl Interpreter {
         // declaring native functions
         let time_function = super::native_functions::Clock;
         let print_function = super::native_functions::Print;
+        let println_function = super::native_functions::PrintLn;
         env.define(
             String::from("clock"),
             Value::Callable(RoxCallable::new(Box::new(time_function))),
@@ -84,6 +74,10 @@ impl Interpreter {
         env.define(
             String::from("print"),
             Value::Callable(RoxCallable::new(Box::new(print_function))),
+        );
+        env.define(
+            String::from("println"),
+            Value::Callable(RoxCallable::new(Box::new(println_function))),
         );
         Self {
             env: Rc::new(RefCell::new(env)),
@@ -136,7 +130,12 @@ impl Interpreter {
                 if rhs == 0.0 {
                     Ok(Value::Number(0.0))
                 } else {
-                    Ok(Value::Number(lhs / rhs))
+                    // if number doesn't have a fractional part, return an integer
+                    if lhs % 1.0 == 0.0 && rhs % 1.0 == 0.0 && lhs / rhs >= 1.0 {
+                        Ok(Value::Number((lhs / rhs).trunc()))
+                    } else {
+                        Ok(Value::Number(lhs / rhs))
+                    }
                 }
             }
             _ => Self::eq_order_op(lhs, rhs, op),
@@ -744,5 +743,14 @@ mod test {
         let token_type = TokenType::Slash;
         let result = Interpreter::token_type_matches(&token_type, &token_types);
         assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_binary_op_numbers_divide_ints_trunks() {
+        let lhs = 10.0;
+        let rhs = 3.0;
+
+        let result = Interpreter::binary_op_numbers(lhs, rhs, &TokenType::Slash).unwrap();
+        assert_eq!(result, Value::Number((lhs / rhs).trunc()));
     }
 }
