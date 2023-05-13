@@ -203,7 +203,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         match self.next_matches(&[SemiColon]) {
             Ok(true) => Ok(Stmt::new_expr_stmt(expr)),
             Ok(false) if Self::matches(self.tokens.peek().unwrap(), &[Eof]) && self.repl_mode => {
-                Ok(Stmt::new_print_repl(expr))
+                Ok(Stmt::new_repl_print(expr))
             }
             Ok(false) => Err(ParseError::ExpectedToken {
                 token: ";".to_string(),

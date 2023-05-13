@@ -6,4 +6,6 @@ pub enum RoxError {
     Parser,
     #[error("RuntimeError")]
     RuntimeError,
+    #[error("ResolveError")]
+    Resolve,
 }

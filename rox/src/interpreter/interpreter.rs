@@ -2,8 +2,12 @@ use super::environment::Environment;
 use super::error::RuntimeError::{self, *};
 use crate::parser::exprs::{expr_type, Expr, ExprVisitor};
 use crate::parser::stmts::{stmt_type, Stmt, StmtVisitor};
-use crate::scanner::scanner::TokenType::{self, *};
+use crate::scanner::scanner::{
+    FloatType,
+    TokenType::{self, *},
+};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -58,6 +62,7 @@ impl std::fmt::Display for Value {
 
 pub struct Interpreter {
     env: Rc<RefCell<Environment>>,
+    locals: HashMap<Expr, usize>,
 }
 
 impl Interpreter {
@@ -81,6 +86,7 @@ impl Interpreter {
         );
         Self {
             env: Rc::new(RefCell::new(env)),
+            locals: HashMap::new(),
         }
     }
 
@@ -114,6 +120,33 @@ impl Interpreter {
         Err(RuntimeError::UndefinedVariable {
             ident: name.to_owned(),
         })
+    }
+
+    fn lookup_var(
+        &mut self,
+        name: &str,
+        expr: &expr_type::Variable,
+    ) -> Result<Value, RuntimeError> {
+        let expr = Expr::Variable(expr.clone());
+        let distance = self.locals.get(&expr);
+        if let Some(dist) = distance {
+            // eprintln!("looking for var {} at distance {} with locals {:?}", name, dist, self.locals);
+            if let Some(v) = self.env.borrow_mut().get_at(name, *dist) {
+                Ok(v)
+            } else {
+                Err(RuntimeError::UndefinedVariable {
+                    ident: name.to_owned(),
+                })
+            }
+        } else {
+            if let Some(v) = self.env.borrow_mut().get_global(name) {
+                Ok(v)
+            } else {
+                Err(RuntimeError::UndefinedVariable {
+                    ident: name.to_owned(),
+                })
+            }
+        }
     }
 
     fn token_type_matches(ty: &TokenType, typs: &[TokenType]) -> bool {
@@ -175,6 +208,10 @@ impl Interpreter {
         };
         Ok(Value::Bool(v))
     }
+
+    pub fn resolve(&mut self, expr: Expr, nb_scopes: usize) {
+        self.locals.insert(expr, nb_scopes);
+    }
 }
 
 impl StmtVisitor for Interpreter {
@@ -184,7 +221,7 @@ impl StmtVisitor for Interpreter {
     fn accept(&mut self, stmt: Stmt) -> Result<Self::Value, Self::Error> {
         match stmt {
             Stmt::ExprStmt(s) => self.visit_expr_stmt(s),
-            Stmt::Print(s) => self.visit_print_stmt(s),
+            Stmt::ReplPrint(s) => self.visit_repl_print(s),
             Stmt::VarDecl(s) => self.visit_var_stmt(s),
             Stmt::Block(s) => self.visit_block(s),
             Stmt::IfStmt(s) => self.visit_if_stmt(s),
@@ -199,7 +236,7 @@ impl StmtVisitor for Interpreter {
         Ok(None)
     }
 
-    fn visit_print_stmt(&mut self, stmt: stmt_type::Print) -> Result<Self::Value, Self::Error> {
+    fn visit_repl_print(&mut self, stmt: stmt_type::ReplPrint) -> Result<Self::Value, Self::Error> {
         let v = ExprVisitor::accept(self, stmt.value().clone())?;
         println!("{v}");
         Ok(None)
@@ -301,7 +338,7 @@ impl ExprVisitor for Interpreter {
     fn visit_literal(&mut self, expr: expr_type::Literal) -> Result<Self::Value, Self::Error> {
         Ok(match expr.ty() {
             Null => Value::Null,
-            Number(num) => Value::Number(num),
+            Number(FloatType(num)) => Value::Number(num),
             RoxString(str) => Value::Str(str),
             True => Value::Bool(true),
             False => Value::Bool(false),
@@ -504,7 +541,7 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_variable(&mut self, expr: expr_type::Variable) -> Result<Self::Value, Self::Error> {
-        let var = self.get_var(expr.name())?;
+        let var = self.lookup_var(expr.name(), &expr)?;
         if var == Value::Uninitialized {
             return Err(UninitializedVariable {
                 ident: expr.name().to_owned(),
@@ -518,9 +555,16 @@ impl ExprVisitor for Interpreter {
         &mut self,
         expr: expr_type::Assignment,
     ) -> Result<Self::Value, Self::Error> {
-        let name = expr.name().to_owned();
         let value = ExprVisitor::accept(self, expr.ty().clone())?;
-        self.assign_var(name, value.clone())?;
+        let name = expr.name().to_owned();
+        let expr = Expr::Assignment(expr);
+        let dist = self
+            .locals
+            .get(&expr)
+            .expect("Expect to find expr in locals");
+        self.env
+            .borrow_mut()
+            .assign_at(name.as_str(), value.clone(), *dist);
         Ok(value)
     }
 
@@ -584,6 +628,18 @@ impl LoxFunction {
             closure,
         }
     }
+
+    fn error_missing_arg(&self, args: Vec<Value>) -> RuntimeError {
+        MissingPositionalArguments {
+            args: self
+                .declaration
+                .params()
+                .iter()
+                .skip(args.len())
+                .map(|p| format!("'{}'", p.lexeme()))
+                .collect(),
+        }
+    }
 }
 
 impl Callable for LoxFunction {
@@ -592,22 +648,14 @@ impl Callable for LoxFunction {
         interpreter: &mut Interpreter,
         args: Vec<Value>,
     ) -> Result<Value, RuntimeError> {
-        let mut ret_val = Value::Null;
         if args.len() < self.arity() {
-            return Err(MissingPositionalArguments {
-                args: self
-                    .declaration
-                    .params()
-                    .iter()
-                    .skip(args.len())
-                    .map(|p| format!("'{}'", p.lexeme()))
-                    .collect(),
-            });
+            return Err(self.error_missing_arg(args));
         } else if args.len() > self.arity() {
             return Err(TooManyArguments {
                 fun: self.declaration.name().to_string(),
             });
         }
+
         let prev_env = Rc::clone(&interpreter.env);
         interpreter.env = Rc::new(RefCell::new(Environment::new(Some(Rc::clone(
             &self.closure,
@@ -619,6 +667,10 @@ impl Callable for LoxFunction {
             .for_each(|(param, arg)| {
                 interpreter.define_var(param.lexeme().to_owned(), arg.clone());
             });
+
+        // interpreter.env.borrow_mut().debug();
+
+        let mut ret_val = Value::Null;
         for stmt in self.declaration.body().iter() {
             if let Some(v) = interpreter.execute(stmt.to_owned())? {
                 ret_val = v;

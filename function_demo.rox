@@ -1,5 +1,5 @@
 fn putnbr(n) {
-    if n <= 9 {
+    if n <= 9  {
         print(n);
     } else {
         putnbr(n / 10);
@@ -79,3 +79,14 @@ let counter = make_counter();
 counter();
 counter();
 counter();
+
+let a = "global";
+{
+    fn print_a() {
+        println(a);
+    }
+
+    print_a();
+    let a = "block";
+    print_a();
+}

@@ -14,4 +14,7 @@ pub enum ParseError {
 
     #[error("Parse error: Cant have more than 255 arguments")]
     MaxNbArgumentsReached,
+
+    #[error("Parse error: Can't read local variable in its own initializer")]
+    ReadVarInInit
 }

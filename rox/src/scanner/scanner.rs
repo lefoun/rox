@@ -135,7 +135,9 @@ impl Scanner {
         let mut literal: String = String::from(chr);
         literal.extend(
             source
-                .peeking_take_while(|(_, chr)| chr.is_ascii_alphabetic() || *chr == '_')
+                .peeking_take_while(|(_, chr)| {
+                    chr.is_ascii_alphabetic() || chr.is_ascii_alphanumeric() || *chr == '_'
+                })
                 .map(|(_, chr)| chr),
         );
 
@@ -162,8 +164,11 @@ impl Scanner {
             Ok(number) => {
                 self.current += num.len();
                 let lexeme = self.source.as_str()[self.start..self.current].to_owned();
-                self.tokens
-                    .push(Token::new(TokenType::Number(number), self.line, lexeme));
+                self.tokens.push(Token::new(
+                    TokenType::Number(FloatType(number)),
+                    self.line,
+                    lexeme,
+                ));
             }
             Err(_) => self.error(chr),
         };
@@ -195,9 +200,13 @@ impl Scanner {
         self.had_error = true;
         eprintln!("Unrecognized character {c} at line {}", self.line);
     }
+
+    pub fn had_error(&self) -> bool {
+        self.had_error
+    }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // single character tokens
     Bang,
@@ -229,7 +238,7 @@ pub enum TokenType {
 
     // literals
     Identifier,
-    Number(f64),
+    Number(FloatType),
     RoxString(String),
 
     // keywords
@@ -253,7 +262,24 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+// Hack to make f64 comparable
+#[derive(Debug, Clone)]
+pub struct FloatType(pub f64);
+
+impl Eq for FloatType {}
+impl PartialEq for FloatType {
+    fn eq(&self, other: &Self) -> bool {
+        (self.0 - other.0).abs() < 0.001
+    }
+}
+impl std::hash::Hash for FloatType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let integral = self.0.trunc() as u64;
+        integral.hash(state);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     token_type: TokenType,
     line: usize,

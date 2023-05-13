@@ -1,3 +1,5 @@
+#![feature(is_some_and)] // used in resolver
+
 mod error;
 mod interpreter;
 mod parser;
@@ -5,23 +7,31 @@ mod scanner;
 
 use error::RoxError;
 use interpreter::interpreter::Interpreter;
-use scanner::scanner::Scanner;
+use interpreter::resolver::Resolver;
 use parser::parser::Parser;
+use scanner::scanner::Scanner;
 use std::fs;
 use std::io::{self, BufRead, Write};
 
 fn run(content: String, interepreter: &mut Interpreter, repl_mode: bool) -> Result<(), RoxError> {
     let mut scanner = Scanner::new(content);
+    if scanner.had_error() {
+        return Err(RoxError::Scan);
+    }
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens.into_iter(), repl_mode);
     let statements = parser.parse();
-    match interepreter.interpret(statements) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            eprintln!("{}: {e}", RoxError::RuntimeError);
-            return Err(RoxError::RuntimeError);
-        }
+    // neeed to handle parse errors here
+    let mut resolver = Resolver::new(interepreter);
+    if let Err(e) = resolver.resolve(statements.clone()) {
+        eprintln!("{}: {e}", RoxError::Resolve);
+        return Err(RoxError::Resolve);
     }
+    if let Err(e) = interepreter.interpret(statements) {
+        eprintln!("{}: {e}", RoxError::RuntimeError);
+        return Err(RoxError::RuntimeError);
+    }
+    Ok(())
 }
 
 pub fn run_file(path: String) -> Result<(), RoxError> {

@@ -7,7 +7,7 @@ pub trait StmtVisitor {
     type Error;
 
     fn accept(&mut self, stmt: Stmt) -> Result<Self::Value, Self::Error>;
-    fn visit_print_stmt(&mut self, stmt: stmt_type::Print) -> Result<Self::Value, Self::Error>;
+    fn visit_repl_print(&mut self, stmt: stmt_type::ReplPrint) -> Result<Self::Value, Self::Error>;
     fn visit_expr_stmt(&mut self, stmt: stmt_type::ExprStmt) -> Result<Self::Value, Self::Error>;
     fn visit_var_stmt(&mut self, stmt: stmt_type::VarDecl) -> Result<Self::Value, Self::Error>;
     fn visit_block(&mut self, stmt: stmt_type::Block) -> Result<Self::Value, Self::Error>;
@@ -25,7 +25,7 @@ pub trait StmtVisitor {
 
 #[derive(Clone, Debug)]
 pub enum Stmt {
-    Print(Print),
+    ReplPrint(ReplPrint),
     ExprStmt(ExprStmt),
     VarDecl(VarDecl),
     Block(Block),
@@ -36,8 +36,8 @@ pub enum Stmt {
 }
 
 impl Stmt {
-    pub fn new_print_repl(value: Expr) -> Self {
-        Self::Print(stmt_type::Print::new(value))
+    pub fn new_repl_print(value: Expr) -> Self {
+        Self::ReplPrint(stmt_type::ReplPrint::new(value))
     }
 
     pub fn new_expr_stmt(value: Expr) -> Self {
@@ -145,8 +145,8 @@ pub mod stmt_type {
     }
 
     #[derive(Debug, Clone)]
-    pub struct Print(Expr);
-    impl Print {
+    pub struct ReplPrint(Expr);
+    impl ReplPrint {
         pub fn new(value: Expr) -> Self {
             Self(value)
         }

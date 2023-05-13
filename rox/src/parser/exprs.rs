@@ -1,6 +1,8 @@
 use crate::scanner::scanner::{Token, TokenType};
 use expr_type::*;
 
+static mut CURRENT_EXPR_ID: usize = 0;
+
 pub trait ExprVisitor {
     type Value;
     type Error;
@@ -16,7 +18,7 @@ pub trait ExprVisitor {
     fn visit_call(&mut self, expr: expr_type::Call) -> Result<Self::Value, Self::Error>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),
@@ -59,7 +61,7 @@ impl Expr {
 
 pub mod expr_type {
     use super::*;
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Binary(Box<Expr>, Token, Box<Expr>);
     impl Binary {
         pub fn new(lhs: Expr, op: Token, rhs: Expr) -> Self {
@@ -83,7 +85,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Grouping(Box<Expr>);
     impl Grouping {
         pub fn new(expr: Expr) -> Self {
@@ -95,7 +97,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Literal(Token);
     impl Literal {
         pub fn new(token: Token) -> Self {
@@ -111,7 +113,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Unary(Token, Box<Expr>);
     impl Unary {
         pub fn new(op: Token, rhs: Expr) -> Self {
@@ -131,11 +133,14 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq)]
-    pub struct Variable(String);
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct Variable(String, usize);
     impl Variable {
         pub fn new(name: &str) -> Self {
-            Self(name.to_owned())
+            Self(name.to_owned(), unsafe {
+                CURRENT_EXPR_ID += 1;
+                CURRENT_EXPR_ID
+            })
         }
 
         pub fn name(&self) -> &str {
@@ -143,11 +148,14 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq)]
-    pub struct Assignment(String, Box<Expr>);
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct Assignment(String, Box<Expr>, usize);
     impl Assignment {
         pub fn new(name: &str, expr: Expr) -> Self {
-            Self(name.to_owned(), Box::new(expr))
+            Self(name.to_owned(), Box::new(expr), unsafe {
+                CURRENT_EXPR_ID += 1;
+                CURRENT_EXPR_ID
+            })
         }
 
         pub fn ty(&self) -> &Expr {
@@ -159,7 +167,7 @@ pub mod expr_type {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Call(Box<Expr>, Token, Vec<Expr>);
     impl Call {
         pub fn new(callee: Expr, left_paren: Token, args: Vec<Expr>) -> Self {
