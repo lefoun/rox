@@ -47,6 +47,10 @@ impl Scanner {
         }
     }
 
+    pub fn had_error(&self) -> bool {
+        self.had_error
+    }
+
     pub fn scan_tokens(&mut self) -> Vec<Token> {
         // need to clone self because behind a mutable borrow
         let source = self.source.to_owned();

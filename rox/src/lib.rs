@@ -13,6 +13,9 @@ use std::io::{self, BufRead, Write};
 fn run(content: String, interepreter: &mut Interpreter, repl_mode: bool) -> Result<(), RoxError> {
     let mut scanner = Scanner::new(content);
     let tokens = scanner.scan_tokens();
+    if scanner.had_error() {
+        return Err(RoxError::Scan);
+    }
     let mut parser = Parser::new(tokens.into_iter(), repl_mode);
     let statements = parser.parse();
     match interepreter.interpret(statements) {
